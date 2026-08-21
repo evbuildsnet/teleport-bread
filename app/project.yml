@@ -1,0 +1,50 @@
+name: InboxZero
+options:
+  bundleIdPrefix: dev.ev.inboxzero
+  deploymentTarget:
+    iOS: "17.0"
+packages:
+  InboxCore:
+    path: ../packages/InboxCore
+targets:
+  InboxZero:
+    type: application
+    platform: iOS
+    sources: [Sources]
+    dependencies:
+      - package: InboxCore
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: InboxZero
+        NSRemindersFullAccessUsageDescription: "InboxZero is a triage surface over your existing reminders."
+        NSRemindersUsageDescription: "InboxZero is a triage surface over your existing reminders."
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.ev.inboxzero.app
+        SWIFT_VERSION: "6.0"
+        TARGETED_DEVICE_FAMILY: "1"
+  InboxZeroUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    dependencies:
+      - target: InboxZero
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.ev.inboxzero.uitests
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  InboxZero:
+    build:
+      targets:
+        InboxZero: all
+        InboxZeroUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets: [InboxZeroUITests]

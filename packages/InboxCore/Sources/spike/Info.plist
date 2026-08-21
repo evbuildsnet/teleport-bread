@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>dev.ev.inboxzero.spike</string>
+	<key>CFBundleName</key>
+	<string>spike</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Phase 0 spike verifies EventKit note roundtrips.</string>
+	<key>NSRemindersUsageDescription</key>
+	<string>Phase 0 spike verifies EventKit note roundtrips.</string>
+</dict>
+</plist>
