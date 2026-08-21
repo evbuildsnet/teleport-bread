@@ -24,11 +24,14 @@ final class AppModel {
 
     var lists: [EKCalendar] { store.lists }
 
-    private var changeObserver: (any NSObjectProtocol)?
+    private var observers: [any NSObjectProtocol] = []
+    private var started = false
 
     // MARK: Lifecycle
 
     func start() async {
+        guard !started else { return }
+        started = true
         switch store.authorizationStatus {
         case .fullAccess:
             phase = .ready
@@ -43,10 +46,14 @@ final class AppModel {
         await seedSimulatorDataIfNeeded()
         await refresh()
 
-        changeObserver = NotificationCenter.default.addObserver(
-            forName: .EKEventStoreChanged, object: store.store, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in await self?.refresh() }
+        // Refresh on store changes and on day rollover (an item due "Today"
+        // becomes overdue at midnight without any store change).
+        for name in [Notification.Name.EKEventStoreChanged, .NSCalendarDayChanged] {
+            observers.append(NotificationCenter.default.addObserver(
+                forName: name, object: nil, queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in await self?.refresh() }
+            })
         }
     }
 
@@ -96,15 +103,24 @@ final class AppModel {
         await refresh()
     }
 
-    func append(_ message: String, to snapshot: ReminderSnapshot) async {
-        try? store.appendMessage(id: snapshot.id, message: message)
+    /// Returns false when the write failed so the UI can hand the text back —
+    /// a user's message must never be silently lost.
+    func append(_ message: String, to snapshot: ReminderSnapshot) async -> Bool {
+        do {
+            try store.appendMessage(id: snapshot.id, message: message)
+        } catch {
+            return false
+        }
         await refresh()
+        return true
     }
 
     func capture(title: String) async {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        try? store.createReminder(title: trimmed, due: .now)
+        // Capture into a list the active filter can actually show.
+        let target = selectedCalendars()?.first
+        try? store.createReminder(title: trimmed, due: .now, in: target)
         await refresh()
     }
 
@@ -154,14 +170,14 @@ final class AppModel {
             reminder.title = title
             reminder.notes = note
             if let due {
-                reminder.dueDateComponents = Calendar.current.dateComponents([.year, .month, .day], from: due)
+                reminder.dueDateComponents = ReminderStore.dateOnlyComponents(from: due)
             }
             try? store.store.save(reminder, commit: false)
         }
         let settled = EKReminder(eventStore: store.store)
         settled.calendar = list
         settled.title = "Assess Microsoft Keycloak login"
-        settled.dueDateComponents = Calendar.current.dateComponents([.year, .month, .day], from: day(-1))
+        settled.dueDateComponents = ReminderStore.dateOnlyComponents(from: day(-1))
         settled.isCompleted = true
         try? store.store.save(settled, commit: false)
         try? store.store.commit()

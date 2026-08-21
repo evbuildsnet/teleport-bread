@@ -63,7 +63,7 @@ struct FilterSheet: View {
                     } label: {
                         HStack(spacing: 12) {
                             Circle()
-                                .fill(Color(cgColor: list.cgColor))
+                                .fill(list.cgColor.map { Color(cgColor: $0) } ?? .accentColor)
                                 .frame(width: 10, height: 10)
                             Text(list.title).foregroundStyle(.primary)
                             Spacer()

@@ -65,7 +65,14 @@ final class InboxZeroUITests: XCTestCase {
         let snoozedHeader = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Snoozed'")).firstMatch
         XCTAssertTrue(snoozedHeader.waitForExistence(timeout: 3))
         snoozedHeader.tap()
-        XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 3))
+        // Rows are lazy: scroll until the item enters the hierarchy.
+        let target = app.staticTexts[title]
+        var attempts = 0
+        while !target.exists && attempts < 8 {
+            app.swipeUp()
+            attempts += 1
+        }
+        XCTAssertTrue(target.waitForExistence(timeout: 2))
     }
 
     func testThreadAppendPersistsAcrossRelaunch() {

@@ -52,8 +52,12 @@ public final class ReminderStore {
     private func fetchSnapshots(matching predicate: NSPredicate) async -> [ReminderSnapshot] {
         await withCheckedContinuation { continuation in
             store.fetchReminders(matching: predicate) { reminders in
-                let snapshots = (reminders ?? []).map(Self.snapshot(of:))
-                continuation.resume(returning: snapshots)
+                // EKReminder isn't thread-safe; hand the batch to the main
+                // thread and read it there.
+                let fetched = reminders ?? []
+                DispatchQueue.main.async {
+                    continuation.resume(returning: fetched.map(Self.snapshot(of:)))
+                }
             }
         }
     }
@@ -69,6 +73,9 @@ public final class ReminderStore {
     public func snooze(id: String, to date: Date) throws {
         guard let reminder = liveReminder(id) else { throw ReminderStoreError.notFound }
         reminder.dueDateComponents = Self.dateOnlyComponents(from: date)
+        // A stale absolute alarm would still fire at the old due time,
+        // contradicting the snooze. Alarms belong to the due date.
+        reminder.alarms?.forEach(reminder.removeAlarm)
         try store.save(reminder, commit: true)
     }
 
@@ -112,11 +119,7 @@ public final class ReminderStore {
             listTitle: reminder.calendar?.title ?? "",
             listColorHex: reminder.calendar.flatMap(Self.hexColor(of:)),
             title: reminder.title ?? "",
-            dueDate: reminder.dueDateComponents.flatMap { components in
-                var calendar = components.calendar ?? .current
-                calendar.timeZone = components.timeZone ?? calendar.timeZone
-                return calendar.date(from: components).map(calendar.startOfDay(for:))
-            },
+            dueDate: reminder.dueDateComponents.flatMap(Self.localDueDate(from:)),
             isCompleted: reminder.isCompleted,
             completionDate: reminder.completionDate,
             creationDate: reminder.creationDate,
@@ -124,8 +127,28 @@ public final class ReminderStore {
         )
     }
 
-    nonisolated static func dateOnlyComponents(from date: Date) -> DateComponents {
-        Calendar.current.dateComponents([.year, .month, .day], from: date)
+    /// EventKit expects Gregorian due-date components; deriving them from a
+    /// non-Gregorian Calendar.current (e.g. Buddhist) would write a due date
+    /// centuries off.
+    nonisolated public static func dateOnlyComponents(from date: Date) -> DateComponents {
+        var gregorian = Calendar(identifier: .gregorian)
+        gregorian.timeZone = .current
+        var components = gregorian.dateComponents([.year, .month, .day], from: date)
+        components.calendar = gregorian
+        return components
+    }
+
+    /// Takes the stored calendar day at face value (date-only semantics) and
+    /// anchors it to the local calendar. Flooring an absolute Date in the
+    /// components' own time zone and re-flooring locally would shift the day.
+    nonisolated static func localDueDate(from components: DateComponents) -> Date? {
+        guard let year = components.year, let month = components.month, let day = components.day
+        else { return nil }
+        var calendar = components.calendar ?? Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        // Noon dodges DST days where local midnight doesn't exist.
+        let noon = DateComponents(year: year, month: month, day: day, hour: 12)
+        return calendar.date(from: noon).map(Calendar.current.startOfDay(for:))
     }
 
     nonisolated private static func hexColor(of calendar: EKCalendar) -> String? {

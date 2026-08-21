@@ -41,6 +41,11 @@ struct ThreadView: View {
                     guard count > 0 else { return }
                     withAnimation { proxy.scrollTo(count - 1, anchor: .bottom) }
                 }
+                .onAppear {
+                    let count = snapshot?.messages.count ?? 0
+                    guard count > 0 else { return }
+                    proxy.scrollTo(count - 1, anchor: .bottom)
+                }
             }
 
             inputBar
@@ -75,7 +80,7 @@ struct ThreadView: View {
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.title2)
             }
-            .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(sanitizedDraft.isEmpty)
             .accessibilityLabel("Append message")
         }
         .padding(.horizontal)
@@ -83,11 +88,24 @@ struct ThreadView: View {
         .background(.bar)
     }
 
+    /// U+2063 is invisible and not in .whitespacesAndNewlines — without
+    /// stripping it first, a pasted invisible-only draft would append a
+    /// permanently empty message.
+    private var sanitizedDraft: String {
+        draft
+            .replacingOccurrences(of: String(NoteCodec.invisibleSeparator), with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func send() {
         guard let snapshot else { return }
-        let message = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let message = sanitizedDraft
         guard !message.isEmpty else { return }
         draft = ""
-        Task { await model.append(message, to: snapshot) }
+        Task {
+            if await !model.append(message, to: snapshot), draft.isEmpty {
+                draft = message
+            }
+        }
     }
 }

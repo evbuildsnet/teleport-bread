@@ -53,12 +53,17 @@ struct InboxView: View {
 
     @ViewBuilder private var inboxSection: some View {
         if inbox.isEmpty {
-            ContentUnavailableView(
-                "Inbox Zero",
-                systemImage: "checkmark.circle",
-                description: Text("Nothing due. Enjoy the quiet.")
-            )
-            .listRowBackground(Color.clear)
+            if model.searchText.isEmpty {
+                ContentUnavailableView(
+                    "Inbox Zero",
+                    systemImage: "checkmark.circle",
+                    description: Text("Nothing due. Enjoy the quiet.")
+                )
+                .listRowBackground(Color.clear)
+            } else {
+                ContentUnavailableView.search(text: model.searchText)
+                    .listRowBackground(Color.clear)
+            }
         } else {
             Section {
                 ForEach(inbox) { snapshot in
