@@ -33,7 +33,7 @@ final class InboxZeroUITests: XCTestCase {
         let compose = app.buttons["New need"]
         XCTAssertTrue(compose.waitForExistence(timeout: 10), "inbox should finish loading")
         compose.tap()
-        let field = app.textFields["What do you need?"]
+        let field = app.descendants(matching: .any)["needTitleField"].firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
         field.typeText(title)
@@ -84,7 +84,7 @@ final class InboxZeroUITests: XCTestCase {
         let end = list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
         start.press(forDuration: 0.2, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.3)
 
-        let field = app.textFields["What do you need?"]
+        let field = app.descendants(matching: .any)["needTitleField"].firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 5), "releasing past the threshold should open compose")
         app.buttons["Discard"].tap()
     }

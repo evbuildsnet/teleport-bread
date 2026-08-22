@@ -37,7 +37,8 @@ import Testing
             snapshot("done", due: friday, completed: true),
         ], today: date(2026, 8, 21, hour: 17))
 
-        #expect(sections.inbox.map(\.id) == ["overdue", "today", "todayLateFetch"])
+        // Newest-created first; items without a creation date sink to the bottom.
+        #expect(sections.inbox.map(\.id) == ["todayLateFetch", "overdue", "today"])
         #expect(sections.snoozed.map(\.id) == ["future"])
     }
 
@@ -50,13 +51,22 @@ import Testing
         #expect(sections.snoozed.isEmpty)
     }
 
-    @Test func inboxSortsByDueThenCreation() {
+    @Test func inboxSortsNewestCreatedFirst() {
         let sections = engine.sections(from: [
             snapshot("b", due: friday, created: date(2026, 8, 20)),
             snapshot("a", due: friday, created: date(2026, 8, 18)),
-            snapshot("oldest", due: date(2026, 8, 10), created: date(2026, 8, 20)),
+            snapshot("oldDueNewest", due: date(2026, 8, 10), created: date(2026, 8, 21)),
         ], today: friday)
-        #expect(sections.inbox.map(\.id) == ["oldest", "a", "b"])
+        #expect(sections.inbox.map(\.id) == ["oldDueNewest", "b", "a"])
+    }
+
+    @Test func snoozedSortsBySoonestDueThenNewest() {
+        let sections = engine.sections(from: [
+            snapshot("later", due: date(2026, 8, 30), created: date(2026, 8, 21)),
+            snapshot("soonOld", due: date(2026, 8, 25), created: date(2026, 8, 18)),
+            snapshot("soonNew", due: date(2026, 8, 25), created: date(2026, 8, 20)),
+        ], today: friday)
+        #expect(sections.snoozed.map(\.id) == ["soonNew", "soonOld", "later"])
     }
 
     @Test func snoozeTomorrow() {

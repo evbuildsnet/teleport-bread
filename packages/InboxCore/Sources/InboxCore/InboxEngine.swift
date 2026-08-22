@@ -40,18 +40,22 @@ public struct InboxEngine: Sendable {
                 result.inbox.append(snapshot)
             }
         }
-        result.inbox.sort(by: dueThenCreation)
-        result.snoozed.sort(by: dueThenCreation)
+        // Inbox: newest-created first, so a freshly captured need lands on top.
+        result.inbox.sort(by: newestFirst)
+        // Snoozed: soonest due first, newest within a day.
+        result.snoozed.sort { a, b in
+            let dueA = a.dueDate ?? .distantFuture
+            let dueB = b.dueDate ?? .distantFuture
+            if dueA != dueB { return dueA < dueB }
+            return newestFirst(a, b)
+        }
         return result
     }
 
-    private func dueThenCreation(_ a: ReminderSnapshot, _ b: ReminderSnapshot) -> Bool {
-        let dueA = a.dueDate ?? .distantFuture
-        let dueB = b.dueDate ?? .distantFuture
-        if dueA != dueB { return dueA < dueB }
+    private func newestFirst(_ a: ReminderSnapshot, _ b: ReminderSnapshot) -> Bool {
         let createdA = a.creationDate ?? .distantPast
         let createdB = b.creationDate ?? .distantPast
-        if createdA != createdB { return createdA < createdB }
+        if createdA != createdB { return createdA > createdB }
         return a.id < b.id
     }
 

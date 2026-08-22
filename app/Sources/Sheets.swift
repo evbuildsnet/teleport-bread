@@ -26,12 +26,21 @@ struct CaptureSheet: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 14) {
-                TextField("What do you need?", text: $draft.title)
+                // Wraps long titles; Enter still submits (a vertical-axis field
+                // would otherwise insert a newline).
+                TextField("What do you need?", text: $draft.title, axis: .vertical)
+                    .lineLimit(1...6)
                     .font(.title3)
                     .focused($focused)
                     .submitLabel(mode == .create ? .send : .done)
                     .onSubmit(send)
+                    .onChange(of: draft.title) { _, value in
+                        guard value.contains("\n") else { return }
+                        draft.title = value.replacingOccurrences(of: "\n", with: " ")
+                        send()
+                    }
                     .accessibilityLabel("Need title")
+                    .accessibilityIdentifier("needTitleField")
 
                 if !model.listOptions.isEmpty {
                     Menu {
