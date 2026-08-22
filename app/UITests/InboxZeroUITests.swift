@@ -70,6 +70,20 @@ final class InboxZeroUITests: XCTestCase {
 
     // MARK: Tests
 
+    func testPullDownPastThresholdOpensCompose() {
+        let compose = app.buttons["New need"]
+        XCTAssertTrue(compose.waitForExistence(timeout: 10))
+        // Press on the list and drag well past the overscroll threshold, then release.
+        let list = app.collectionViews.firstMatch
+        let start = list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15))
+        let end = list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+        start.press(forDuration: 0.2, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.3)
+
+        let field = app.textFields["What do you need?"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "releasing past the threshold should open compose")
+        app.buttons["Discard"].tap()
+    }
+
     func testCaptureThenSettleRemovesFromInbox() {
         let title = unique("UITest settle")
         capture(title)
