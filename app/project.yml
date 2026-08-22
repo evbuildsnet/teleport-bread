@@ -3,6 +3,11 @@ options:
   bundleIdPrefix: dev.ev.inboxzero
   deploymentTarget:
     iOS: "26.0"
+    macOS: "26.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: 8X2Q3D3Y48
 packages:
   InboxCore:
     path: ../packages/InboxCore
@@ -10,7 +15,7 @@ targets:
   InboxZero:
     type: application
     platform: iOS
-    sources: [Sources]
+    sources: [Sources, Shared]
     dependencies:
       - package: InboxCore
     info:
@@ -24,7 +29,6 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.ev.inboxzero.app
-        SWIFT_VERSION: "6.0"
         TARGETED_DEVICE_FAMILY: "1"
   InboxZeroUITests:
     type: bundle.ui-testing
@@ -35,7 +39,40 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.ev.inboxzero.uitests
-        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
+  InboxZeroMac:
+    type: application
+    platform: macOS
+    sources: [Mac, Shared]
+    dependencies:
+      - package: InboxCore
+    info:
+      path: Mac/Info.plist
+      properties:
+        CFBundleDisplayName: InboxZero
+        NSRemindersFullAccessUsageDescription: "InboxZero is a triage surface over your existing reminders."
+        NSRemindersUsageDescription: "InboxZero is a triage surface over your existing reminders."
+        LSApplicationCategoryType: public.app-category.productivity
+        NSHumanReadableCopyright: ""
+    entitlements:
+      path: Mac/InboxZeroMac.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.personal-information.reminders: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.ev.inboxzero.mac
+        PRODUCT_NAME: InboxZero
+        ENABLE_HARDENED_RUNTIME: YES
+  InboxZeroMacUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources: [MacUITests]
+    dependencies:
+      - target: InboxZeroMac
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.ev.inboxzero.mac.uitests
         GENERATE_INFOPLIST_FILE: YES
 schemes:
   InboxZero:
@@ -48,3 +85,13 @@ schemes:
     test:
       config: Debug
       targets: [InboxZeroUITests]
+  InboxZeroMac:
+    build:
+      targets:
+        InboxZeroMac: all
+        InboxZeroMacUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets: [InboxZeroMacUITests]

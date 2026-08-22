@@ -1,0 +1,455 @@
+import InboxCore
+import SwiftUI
+
+/// T3-style flat lifecycle list: Drafts · Inbox cards · Snoozed shelf ·
+/// Settled shelf · Show N more. Search and list filter live in the header.
+struct Sidebar: View {
+    @Environment(AppModel.self) private var model
+    @Environment(UIState.self) private var ui
+    @FocusState private var searchFocused: Bool
+
+    private var drafts: [NeedDraft] {
+        var rows = model.drafts.filter(model.matchesSearch)
+        if let active = ui.activeDraft, !model.drafts.contains(where: { $0.id == active.id }) {
+            rows.insert(active, at: 0)
+        }
+        return rows
+    }
+    private var inbox: [ReminderSnapshot] { model.inbox.filter(model.matchesSearch) }
+    private var snoozed: [ReminderSnapshot] { model.snoozed.filter(model.matchesSearch) }
+    private var settled: [ReminderSnapshot] { model.settled.filter(model.matchesSearch) }
+    private var selectedID: String? { ui.selection?.needID }
+
+    var body: some View {
+        @Bindable var model = model
+        @Bindable var ui = ui
+        VStack(spacing: 0) {
+            header
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(drafts) { DraftRow(draft: $0) }
+                        if !drafts.isEmpty { divider }
+                        inboxRows
+                        shelf("Snoozed", items: snoozed, isExpanded: $ui.snoozedExpanded) { item in
+                            NeedRow(snapshot: item, placement: .snoozed, number: number(of: item))
+                        }
+                        shelf("Settled", items: settled, isExpanded: $ui.settledExpanded) { item in
+                            NeedRow(snapshot: item, placement: .settled, number: number(of: item))
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                }
+                .onChange(of: ui.selection) { _, selection in
+                    guard let id = selection?.needID else { return }
+                    proxy.scrollTo(id, anchor: nil)
+                }
+            }
+        }
+        .overlay(alignment: .trailing) {
+            Rectangle().fill(Theme.sidebarBorder).frame(width: 1)
+        }
+    }
+
+    // MARK: Header
+
+    private var header: some View {
+        @Bindable var model = model
+        return VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Spacer().frame(width: 70) // traffic lights
+                Button {
+                    withAnimation(.snappy(duration: 0.2)) { ui.sidebarVisible.toggle() }
+                } label: {
+                    Image(systemName: "sidebar.left")
+                }
+                .buttonStyle(SidebarIconButtonStyle())
+                .help("Hide sidebar (⌘B)")
+                Text("InboxZero")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.sidebarText)
+                Spacer()
+            }
+            .frame(height: Theme.topBarHeight)
+            .padding(.horizontal, 8)
+            .gesture(WindowDragGesture())
+
+            HStack(spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(Theme.sidebarMuted)
+                    TextField("Search", text: $model.searchText)
+                        .textFieldStyle(.plain)
+                        .focused($searchFocused)
+                        .onKeyPress(.escape) {
+                            model.searchText = ""
+                            searchFocused = false
+                            return .handled
+                        }
+                        .accessibilityLabel("Search needs")
+                }
+                .font(.system(size: 13))
+                .padding(.horizontal, 8)
+                .frame(height: 28)
+                .background(Theme.sidebarHover, in: RoundedRectangle(cornerRadius: Theme.controlRadius))
+                Button {
+                    ui.newDraft(model: model)
+                } label: {
+                    Image(systemName: "square.and.pencil")
+                }
+                .buttonStyle(SidebarIconButtonStyle())
+                .help("New need (⌘N)")
+                .accessibilityLabel("New need")
+            }
+            .padding(.horizontal, 10)
+
+            ListFilterMenu()
+                .padding(.horizontal, 10)
+                .padding(.bottom, 4)
+        }
+    }
+
+    // MARK: Sections
+
+    private var divider: some View {
+        Rectangle().fill(Theme.sidebarBorder).frame(height: 1).padding(.vertical, 6)
+    }
+
+    @ViewBuilder private var inboxRows: some View {
+        if inbox.isEmpty {
+            if model.isSearching {
+                if drafts.isEmpty && snoozed.isEmpty && settled.isEmpty {
+                    emptyLabel("No results")
+                }
+            } else if drafts.isEmpty {
+                emptyLabel("Inbox Zero")
+            }
+        } else {
+            ForEach(inbox) { item in
+                NeedCard(snapshot: item, number: number(of: item))
+                    .id(item.id)
+            }
+        }
+    }
+
+    private func emptyLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 13))
+            .foregroundStyle(Theme.sidebarMuted)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 24)
+    }
+
+    /// Collapsed header shows "(n)"; expanded shows the bare title. A
+    /// collapsed shelf still renders the selected row so selection never hides.
+    @ViewBuilder
+    private func shelf<Content: View>(
+        _ title: String,
+        items: [ReminderSnapshot],
+        isExpanded: Binding<Bool>,
+        @ViewBuilder row: @escaping (ReminderSnapshot) -> Content
+    ) -> some View {
+        if !items.isEmpty {
+            let open = isExpanded.wrappedValue || model.isSearching
+            Button {
+                withAnimation(.snappy(duration: 0.2)) { isExpanded.wrappedValue.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Text(open ? title : "\(title) (\(items.count))")
+                        .font(.system(size: 12, weight: .medium))
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                        .rotationEffect(.degrees(open ? 0 : -90))
+                }
+                .foregroundStyle(Theme.sidebarMuted)
+                .padding(.horizontal, 10)
+                .frame(height: 30)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 8)
+            .accessibilityLabel("\(title) section")
+
+            let visible = title == "Settled" ? Array(items.prefix(ui.settledShown)) : items
+            if open {
+                ForEach(visible) { item in row(item).id(item.id) }
+                if title == "Settled", items.count > visible.count {
+                    Button {
+                        ui.settledShown += UIState.settledPageCount
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus").font(.system(size: 10, weight: .semibold))
+                            Text("Show \(min(items.count - visible.count, UIState.settledPageCount)) more")
+                        }
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.sidebarMuted)
+                        .padding(.horizontal, 10)
+                        .frame(height: Theme.rowHeight)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            } else if let selectedID, let kept = items.first(where: { $0.id == selectedID }) {
+                row(kept).id(kept.id)
+            }
+        }
+    }
+
+    /// 1-based jump number within the rendered order, first nine only.
+    private func number(of item: ReminderSnapshot) -> Int? {
+        guard ui.commandHeld else { return nil }
+        let rows = ui.renderedNeeds(model)
+        guard let index = rows.firstIndex(where: { $0.id == item.id }), index < 9 else { return nil }
+        return index + 1
+    }
+}
+
+// MARK: - Rows
+
+/// 78pt card for an inbox need: list + title, overdue chip or hover actions.
+struct NeedCard: View {
+    @Environment(AppModel.self) private var model
+    @Environment(UIState.self) private var ui
+    let snapshot: ReminderSnapshot
+    let number: Int?
+    @State private var hovering = false
+
+    private var isSelected: Bool { ui.selection == .need(snapshot.id) }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Color(hexString: snapshot.listColorHex) ?? Theme.accent)
+                        .frame(width: 7, height: 7)
+                    Text(snapshot.listTitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.sidebarMuted)
+                        .lineLimit(1)
+                }
+                Text(snapshot.title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Theme.sidebarText)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            trailing
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .frame(height: Theme.cardHeight, alignment: .top)
+        .background(rowBackground(isSelected: isSelected, hovering: hovering), in: RoundedRectangle(cornerRadius: Theme.radius))
+        .contentShape(Rectangle())
+        .onTapGesture { ui.open(.need(snapshot.id), model: model) }
+        .onHover { hovering = $0 }
+        .contextMenu { NeedActionMenu(snapshot: snapshot) }
+        .overlay(alignment: .bottomTrailing) { JumpBadge(number: number) }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(snapshot.title)
+        .accessibilityAddTraits(.isButton)
+    }
+
+    @ViewBuilder private var trailing: some View {
+        if hovering {
+            HoverActions(snapshot: snapshot, placement: .inbox)
+        } else if let due = snapshot.dueDate, Calendar.current.startOfDay(for: due) < Calendar.current.startOfDay(for: .now) {
+            Text(RelativeLabel.due(due))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.orange)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(.orange.opacity(0.12), in: Capsule())
+        }
+    }
+}
+
+/// 36pt compact row for snoozed/settled needs: title + time, hover actions.
+struct NeedRow: View {
+    enum Placement { case snoozed, settled }
+
+    @Environment(AppModel.self) private var model
+    @Environment(UIState.self) private var ui
+    let snapshot: ReminderSnapshot
+    let placement: Placement
+    let number: Int?
+    @State private var hovering = false
+
+    private var isSelected: Bool { ui.selection == .need(snapshot.id) }
+
+    private var timeLabel: String {
+        switch placement {
+        case .snoozed: snapshot.dueDate.map { RelativeLabel.due($0) } ?? ""
+        case .settled: snapshot.completionDate.map { RelativeLabel.since($0) } ?? ""
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(Color(hexString: snapshot.listColorHex) ?? Theme.accent)
+                .frame(width: 6, height: 6)
+                .opacity(0.7)
+            Text(snapshot.title)
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.sidebarMuted)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if hovering {
+                HoverActions(snapshot: snapshot, placement: placement == .snoozed ? .snoozed : .settled)
+            } else {
+                Text(timeLabel)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.sidebarMuted.opacity(0.8))
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: Theme.rowHeight)
+        .background(rowBackground(isSelected: isSelected, hovering: hovering), in: RoundedRectangle(cornerRadius: Theme.controlRadius))
+        .contentShape(Rectangle())
+        .onTapGesture { ui.open(.need(snapshot.id), model: model) }
+        .onHover { hovering = $0 }
+        .contextMenu { NeedActionMenu(snapshot: snapshot) }
+        .overlay(alignment: .bottomTrailing) { JumpBadge(number: number) }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(snapshot.title)
+        .accessibilityAddTraits(.isButton)
+    }
+}
+
+struct DraftRow: View {
+    @Environment(AppModel.self) private var model
+    @Environment(UIState.self) private var ui
+    let draft: NeedDraft
+    @State private var hovering = false
+
+    private var isSelected: Bool { ui.selection == .draft(draft.id) }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "pencil.line")
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.sidebarMuted)
+            Text(draft.title.isEmpty ? "New need" : draft.title)
+                .font(.system(size: 13))
+                .italic()
+                .foregroundStyle(Theme.sidebarMuted)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if hovering {
+                Button {
+                    if ui.activeDraft?.id == draft.id { ui.activeDraft = nil }
+                    model.discard(draft)
+                    if isSelected { ui.selection = nil }
+                } label: {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(SidebarIconButtonStyle())
+                .help("Discard draft")
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: Theme.rowHeight)
+        .background(rowBackground(isSelected: isSelected, hovering: hovering), in: RoundedRectangle(cornerRadius: Theme.controlRadius))
+        .contentShape(Rectangle())
+        .onTapGesture { ui.open(.draft(draft.id), model: model) }
+        .onHover { hovering = $0 }
+    }
+}
+
+private func rowBackground(isSelected: Bool, hovering: Bool) -> Color {
+    isSelected ? Theme.sidebarSelected : hovering ? Theme.sidebarHover : .clear
+}
+
+struct JumpBadge: View {
+    let number: Int?
+    var body: some View {
+        if let number {
+            Text("⌘\(number)")
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(Theme.sidebarText)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(Theme.sidebarHover, in: RoundedRectangle(cornerRadius: 5))
+                .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Theme.border))
+                .padding(6)
+        }
+    }
+}
+
+struct SidebarIconButtonStyle: ButtonStyle {
+    @State private var hovering = false
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(configuration.isPressed ? Theme.sidebarText : Theme.sidebarMuted)
+            .frame(width: 26, height: 26)
+            .background(hovering ? Theme.sidebarHover : .clear, in: RoundedRectangle(cornerRadius: 6))
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
+    }
+}
+
+/// "All lists ▾" — checkmark menu over Reminders lists (T3's project filter).
+struct ListFilterMenu: View {
+    @Environment(AppModel.self) private var model
+
+    private var label: String {
+        guard let selected = model.selectedListIDs else { return "All lists" }
+        let titles = model.listOptions.filter { selected.contains($0.id) }.map(\.title)
+        return titles.count == 1 ? titles[0] : "\(titles.count) lists"
+    }
+
+    var body: some View {
+        Menu {
+            Button {
+                model.selectedListIDs = nil
+                Task { await model.refresh() }
+            } label: {
+                if model.selectedListIDs == nil { Label("All lists", systemImage: "checkmark") } else { Text("All lists") }
+            }
+            Divider()
+            ForEach(model.listOptions) { list in
+                Button {
+                    toggle(list.id)
+                } label: {
+                    if model.selectedListIDs?.contains(list.id) == true {
+                        Label(list.title, systemImage: "checkmark")
+                    } else {
+                        Text(list.title)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "tray.2")
+                    .font(.system(size: 11))
+                Text(label)
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+                Spacer()
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+            }
+            .foregroundStyle(Theme.sidebarMuted)
+            .padding(.horizontal, 8)
+            .frame(height: 26)
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .accessibilityLabel("Filter lists")
+    }
+
+    private func toggle(_ id: String) {
+        var selection = model.selectedListIDs ?? []
+        if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
+        model.selectedListIDs = selection.isEmpty ? nil : selection
+        Task { await model.refresh() }
+    }
+}
