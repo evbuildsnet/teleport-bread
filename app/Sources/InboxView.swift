@@ -6,6 +6,7 @@ struct InboxView: View {
 
     @State private var path: [String] = []
     @State private var snoozeTarget: ReminderSnapshot?
+    @State private var datePickTarget: ReminderSnapshot?
     @State private var showFilter = false
     @State private var snoozedExpanded = false
     @State private var settledExpanded = false
@@ -96,17 +97,40 @@ struct InboxView: View {
             CaptureSheet(draft: $draft, outcome: $composeOutcome, mode: .create)
         }
         .sheet(isPresented: $showFilter) { FilterSheet() }
+        .confirmationDialog(
+            "Snooze until",
+            isPresented: Binding(
+                get: { snoozeTarget != nil },
+                set: { if !$0 { snoozeTarget = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            ForEach(SnoozePreset.allCases, id: \.self) { preset in
+                Button(preset.label) {
+                    guard let target = snoozeTarget else { return }
+                    Task { await model.snooze(target, preset) }
+                }
+            }
+            Button("Pick date…") {
+                datePickTarget = snoozeTarget
+            }
+        }
+        .sheet(item: $datePickTarget) { target in
+            SnoozeDateSheet { date in
+                Task { await model.snooze(target, until: date) }
+            }
+        }
         .sensoryFeedback(.success, trigger: model.triageCount)
     }
 
     /// Rides in the overscroll area: fades in with the pull, flips copy when armed.
     private var pullHint: some View {
-        HStack(spacing: 8) {
+        VStack(spacing: 6) {
             Image(systemName: "square.and.pencil")
-                .rotationEffect(.degrees(pullArmed ? 0 : -90 * (1 - pullProgress)))
+                .font(.title2)
             Text(pullArmed ? "Release to add a need" : "Keep pulling to add a need")
+                .font(.footnote.weight(.medium))
         }
-        .font(.footnote.weight(.medium))
         .foregroundStyle(pullArmed ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
         .padding(.top, 8)
         .opacity(pullProgress)
@@ -139,7 +163,7 @@ struct InboxView: View {
                 ContentUnavailableView.search(text: model.searchText)
                     .listRowSeparator(.hidden)
             } else {
-                ForEach(inbox) { row($0, in: .inbox) }
+                inboxRows
             }
         } else if inbox.isEmpty && drafts.isEmpty {
             ContentUnavailableView(
@@ -149,13 +173,19 @@ struct InboxView: View {
             )
             .listRowSeparator(.hidden)
         } else {
-            ForEach(inbox) { row($0, in: .inbox) }
+            inboxRows
+        }
+    }
+
+    private var inboxRows: some View {
+        ForEach(Array(inbox.enumerated()), id: \.element.id) { index, snapshot in
+            row(snapshot, in: .inbox, isLast: index == inbox.count - 1)
         }
     }
 
     private enum Placement { case inbox, snoozed, settled }
 
-    private func row(_ snapshot: ReminderSnapshot, in placement: Placement) -> some View {
+    private func row(_ snapshot: ReminderSnapshot, in placement: Placement, isLast: Bool = false) -> some View {
         let compact = placement != .inbox
         return Button {
             path.append(snapshot.id)
@@ -168,7 +198,7 @@ struct InboxView: View {
                 .padding(.vertical, compact ? 2 : 6)
         }
         .listRowSeparator(.hidden, edges: .top)
-        .listRowSeparator(compact ? .hidden : .visible, edges: .bottom)
+        .listRowSeparator(compact || isLast ? .hidden : .visible, edges: .bottom)
         .listRowSeparatorTint(.primary.opacity(0.08))
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             switch placement {
@@ -191,19 +221,6 @@ struct InboxView: View {
                 .tint(.orange)
                 snoozeButton(snapshot)
             }
-        }
-        .popover(
-            isPresented: Binding(
-                get: { snoozeTarget?.id == snapshot.id },
-                set: { if !$0 { snoozeTarget = nil } }
-            ),
-            arrowEdge: .top
-        ) {
-            SnoozePicker(title: "Snooze until") { date in
-                snoozeTarget = nil
-                Task { await model.snooze(snapshot, until: date) }
-            }
-            .presentationCompactAdaptation(.popover)
         }
     }
 
@@ -303,61 +320,34 @@ struct InboxView: View {
     }
 }
 
-/// Glass popover: presets plus a calendar for an arbitrary day.
-struct SnoozePicker: View {
-    let title: String
+/// Bottom sheet with a full-width calendar for an arbitrary snooze day.
+struct SnoozeDateSheet: View {
+    @Environment(\.dismiss) private var dismiss
     let onPick: (Date) -> Void
-
-    @State private var pickingDate = false
     @State private var date = Calendar.current.date(byAdding: .day, value: 1, to: .now)!
-    private let engine = InboxEngine()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 6)
-            if pickingDate {
-                DatePicker("Day", selection: $date, in: Date.now..., displayedComponents: .date)
+        NavigationStack {
+            VStack(spacing: 12) {
+                DatePicker("Snooze until", selection: $date, in: Date.now..., displayedComponents: .date)
                     .datePickerStyle(.graphical)
-                    .padding(.horizontal, 8)
-                Button {
-                    onPick(date)
-                } label: {
-                    Text("Snooze")
-                        .frame(maxWidth: .infinity)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
                 }
-                .buttonStyle(.borderedProminent)
-                .padding([.horizontal, .bottom], 12)
-            } else {
-                ForEach(SnoozePreset.allCases, id: \.self) { preset in
-                    option(preset.label) { onPick(engine.snoozeDate(preset, from: .now)) }
-                }
-                Divider().padding(.horizontal, 12)
-                option("Pick date…", systemImage: "calendar") {
-                    withAnimation { pickingDate = true }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Snooze") {
+                        onPick(date)
+                        dismiss()
+                    }
                 }
             }
         }
-        .frame(minWidth: 240)
-        .padding(.bottom, pickingDate ? 0 : 6)
-    }
-
-    private func option(_ label: String, systemImage: String? = nil, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Text(label)
-                Spacer()
-                if let systemImage { Image(systemName: systemImage).foregroundStyle(.secondary) }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }
 

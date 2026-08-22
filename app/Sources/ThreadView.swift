@@ -38,9 +38,8 @@ struct ThreadView: View {
                                 .padding(.top, 40)
                         }
                         ForEach(Array(messages.enumerated()), id: \.offset) { index, message in
-                            HStack(alignment: .bottom, spacing: 6) {
-                                Text(message)
-                                    .textSelection(.enabled)
+                            VStack(alignment: .trailing, spacing: 2) {
+                                SelectableText(text: message)
                                     .padding(.horizontal, 14)
                                     .padding(.vertical, 10)
                                     .background(
@@ -67,8 +66,8 @@ struct ThreadView: View {
                                 } label: {
                                     Image(systemName: "ellipsis")
                                         .font(.caption.weight(.bold))
-                                        .foregroundStyle(.secondary)
-                                        .frame(width: 28, height: 28)
+                                        .foregroundStyle(.quaternary)
+                                        .frame(width: 28, height: 22)
                                         .contentShape(Rectangle())
                                 }
                                 .accessibilityLabel("Message actions")
@@ -79,6 +78,9 @@ struct ThreadView: View {
                     }
                     .padding()
                 }
+                .scrollDismissesKeyboard(.interactively)
+                // Tap anywhere outside the composer to put the keyboard away.
+                .simultaneousGesture(TapGesture().onEnded { inputFocused = false })
                 .onChange(of: snapshot?.messages.count ?? 0) { _, count in
                     guard count > 0 else { return }
                     withAnimation { proxy.scrollTo(count - 1, anchor: .bottom) }

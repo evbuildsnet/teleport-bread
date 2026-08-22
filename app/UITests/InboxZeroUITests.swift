@@ -50,6 +50,11 @@ final class InboxZeroUITests: XCTestCase {
             .firstMatch
     }
 
+    /// Message bubbles are UITextViews: match by value, not label.
+    private func bubble(_ message: String) -> XCUIElement {
+        app.textViews.matching(NSPredicate(format: "value == %@", message)).firstMatch
+    }
+
     private func cell(_ title: String) -> XCUIElement {
         app.cells.containing(NSPredicate(format: "label == %@", title)).firstMatch
     }
@@ -133,7 +138,7 @@ final class InboxZeroUITests: XCTestCase {
         field.tap()
         field.typeText(message)
         app.buttons["Append message"].tap()
-        XCTAssertTrue(item(message).waitForExistence(timeout: 5),
+        XCTAssertTrue(bubble(message).waitForExistence(timeout: 5),
                       "appended message should render in the thread")
 
         // The "…" menu exposes the explicit history-edit actions.
@@ -147,7 +152,7 @@ final class InboxZeroUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(scrollTo(item(title)))
         item(title).tap()
-        XCTAssertTrue(item(message).waitForExistence(timeout: 5),
+        XCTAssertTrue(bubble(message).waitForExistence(timeout: 5),
                       "appended message should survive a cold relaunch via EventKit")
 
         // Cleanup: back to the list, settle via the swipe gesture (the only way).
