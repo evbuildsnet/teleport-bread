@@ -30,20 +30,28 @@ final class InboxZeroUITests: XCTestCase {
     }
 
     private func capture(_ title: String) {
-        let compose = app.buttons["New reminder"]
+        let compose = app.buttons["New need"]
         XCTAssertTrue(compose.waitForExistence(timeout: 10), "inbox should finish loading")
         compose.tap()
-        let field = app.textFields["What needs doing?"]
+        let field = app.textFields["What do you need?"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
         field.typeText(title)
-        app.buttons["Add"].tap()
-        XCTAssertTrue(scrollTo(app.staticTexts[title]),
+        app.buttons["Create need"].tap()
+        XCTAssertTrue(scrollTo(item(title)),
                       "captured reminder should appear in the inbox with a Today due date")
     }
 
+    /// Any element whose label is exactly `title` (rows are buttons, thread
+    /// messages are static texts).
+    private func item(_ title: String) -> XCUIElement {
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", title))
+            .firstMatch
+    }
+
     private func cell(_ title: String) -> XCUIElement {
-        app.cells.containing(.staticText, identifier: title).firstMatch
+        app.cells.containing(NSPredicate(format: "label == %@", title)).firstMatch
     }
 
     private func swipeAndTap(_ title: String, action: String) {
@@ -68,7 +76,7 @@ final class InboxZeroUITests: XCTestCase {
 
         swipeAndTap(title, action: "Settle")
 
-        XCTAssertTrue(waitForDisappearance(of: app.staticTexts[title]),
+        XCTAssertTrue(waitForDisappearance(of: item(title)),
                       "settled reminder should leave the inbox")
     }
 
@@ -84,17 +92,17 @@ final class InboxZeroUITests: XCTestCase {
         XCTAssertTrue(waitForDisappearance(of: cell(title)),
                       "snoozed reminder should leave the inbox section")
 
-        let snoozedHeader = app.staticTexts.matching(
+        let snoozedHeader = app.buttons.matching(
             NSPredicate(format: "label BEGINSWITH 'Snoozed'")
         ).firstMatch
         XCTAssertTrue(scrollTo(snoozedHeader))
         snoozedHeader.tap()
-        XCTAssertTrue(scrollTo(app.staticTexts[title]),
+        XCTAssertTrue(scrollTo(item(title)),
                       "snoozed reminder should be listed under Snoozed")
 
         // Cleanup: settle it from the Snoozed section.
         swipeAndTap(title, action: "Settle")
-        XCTAssertTrue(waitForDisappearance(of: app.staticTexts[title]))
+        XCTAssertTrue(waitForDisappearance(of: item(title)))
     }
 
     func testThreadAppendPersistsAcrossRelaunch() {
@@ -102,26 +110,27 @@ final class InboxZeroUITests: XCTestCase {
         let message = "Thought for later \(Int(Date().timeIntervalSince1970))"
         capture(title)
 
-        app.staticTexts[title].tap()
+        item(title).tap()
         let field = app.textFields["Message to your future self"]
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         field.tap()
         field.typeText(message)
         app.buttons["Append message"].tap()
-        XCTAssertTrue(app.staticTexts[message].waitForExistence(timeout: 5),
+        XCTAssertTrue(item(message).waitForExistence(timeout: 5),
                       "appended message should render in the thread")
 
         // Relaunch: the message must come back from EventKit, not app state.
         app.terminate()
         app.launch()
-        XCTAssertTrue(scrollTo(app.staticTexts[title]))
-        app.staticTexts[title].tap()
-        XCTAssertTrue(app.staticTexts[message].waitForExistence(timeout: 5),
+        XCTAssertTrue(scrollTo(item(title)))
+        item(title).tap()
+        XCTAssertTrue(item(message).waitForExistence(timeout: 5),
                       "appended message should survive a cold relaunch via EventKit")
 
-        // Cleanup: settle from the thread toolbar.
-        app.buttons["Settle"].tap()
+        // Cleanup: back to the list, settle via the swipe gesture (the only way).
         app.navigationBars.buttons.firstMatch.tap()
-        XCTAssertTrue(waitForDisappearance(of: app.staticTexts[title]))
+        XCTAssertTrue(scrollTo(item(title)))
+        swipeAndTap(title, action: "Settle")
+        XCTAssertTrue(waitForDisappearance(of: item(title)))
     }
 }

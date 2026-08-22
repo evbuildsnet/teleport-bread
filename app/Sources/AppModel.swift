@@ -3,6 +3,20 @@ import Foundation
 import InboxCore
 import Observation
 
+/// A need being composed. Lives only in memory; no reminder exists until sent.
+struct NeedDraft: Identifiable, Hashable {
+    let id: UUID
+    var title: String
+    var listID: String?
+}
+
+/// Platform-free description of a reminder list for the UI.
+struct ListOption: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let colorHex: String?
+}
+
 @MainActor
 @Observable
 final class AppModel {
@@ -18,9 +32,10 @@ final class AppModel {
         isPreview = false
     }
 
-    private init(preview snapshots: [ReminderSnapshot]) {
+    private init(preview snapshots: [ReminderSnapshot], lists: [ListOption]) {
         isPreview = true
         phase = .ready
+        previewLists = lists
         let sections = engine.sections(from: snapshots, today: .now)
         inbox = sections.inbox
         snoozed = sections.snoozed
@@ -31,6 +46,7 @@ final class AppModel {
     var inbox: [ReminderSnapshot] = []
     var snoozed: [ReminderSnapshot] = []
     var settled: [ReminderSnapshot] = []
+    var drafts: [NeedDraft] = []
     var searchText = ""
     /// Bumped on every successful triage action; drives haptic feedback.
     private(set) var triageCount = 0
@@ -40,7 +56,19 @@ final class AppModel {
         didSet { persistSelection() }
     }
 
-    var lists: [EKCalendar] { store.lists }
+    private var previewLists: [ListOption] = []
+
+    var listOptions: [ListOption] {
+        if isPreview { return previewLists }
+        return store.lists.map {
+            ListOption(id: $0.calendarIdentifier, title: $0.title, colorHex: Self.hex($0.cgColor))
+        }
+    }
+
+    var defaultListID: String? {
+        if isPreview { return previewLists.first?.id }
+        return store.store.defaultCalendarForNewReminders()?.calendarIdentifier
+    }
 
     private var observers: [any NSObjectProtocol] = []
     private var started = false
@@ -92,7 +120,7 @@ final class AppModel {
 
     private func selectedCalendars() -> [EKCalendar]? {
         guard let selectedListIDs else { return nil }
-        let calendars = lists.filter { selectedListIDs.contains($0.calendarIdentifier) }
+        let calendars = store.lists.filter { selectedListIDs.contains($0.calendarIdentifier) }
         return calendars.isEmpty ? nil : calendars
     }
 
@@ -109,7 +137,7 @@ final class AppModel {
             ?? settled.first { $0.id == id }
     }
 
-    // MARK: Actions
+    // MARK: Triage
 
     func settle(_ snapshot: ReminderSnapshot) async {
         if isPreview {
@@ -150,60 +178,60 @@ final class AppModel {
         return true
     }
 
-    func capture(title: String) async {
+    func rename(_ snapshot: ReminderSnapshot, to title: String) async {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty, trimmed != snapshot.title else { return }
         if isPreview {
-            let fresh = ReminderSnapshot(
-                id: UUID().uuidString, listID: "preview", listTitle: "Inbox",
-                listColorHex: "#3B82F6", title: trimmed,
-                dueDate: Calendar.current.startOfDay(for: .now), creationDate: .now
-            )
-            previewReplace(nil, with: fresh)
+            previewReplace(snapshot, with: snapshot.with(title: trimmed))
             return
         }
-        // Capture into a list the active filter can actually show.
-        let target = selectedCalendars()?.first
-        try? store.createReminder(title: trimmed, due: .now, in: target)
+        try? store.rename(id: snapshot.id, title: trimmed)
         await refresh()
     }
 
-    // MARK: Preview support
+    // MARK: Drafts & capture
 
-    /// Re-runs classification over the in-memory set after a local mutation.
-    private func previewReplace(_ old: ReminderSnapshot?, with new: ReminderSnapshot) {
-        var all = inbox + snoozed + settled
-        if let old { all.removeAll { $0.id == old.id } }
-        all.append(new)
-        let sections = engine.sections(from: all, today: .now)
-        inbox = sections.inbox
-        snoozed = sections.snoozed
-        settled = all.filter(\.isCompleted)
-            .sorted { ($0.completionDate ?? .distantPast) > ($1.completionDate ?? .distantPast) }
+    func newDraft() -> NeedDraft {
+        NeedDraft(id: UUID(), title: "", listID: defaultListID)
     }
 
-    static func preview() -> AppModel {
-        let day: (Int) -> Date = { Calendar.current.date(byAdding: .day, value: $0, to: Calendar.current.startOfDay(for: .now))! }
-        func item(_ id: String, _ title: String, list: String = "Reminders", color: String = "#3B82F6",
-                  due: Int, note: String? = nil, done: Bool = false) -> ReminderSnapshot {
-            ReminderSnapshot(
-                id: id, listID: list, listTitle: list, listColorHex: color, title: title,
-                dueDate: day(due), isCompleted: done, completionDate: done ? day(0) : nil,
-                creationDate: day(-5), note: note
-            )
+    /// Called when the compose sheet is swiped away: keep the work in memory.
+    func stash(_ draft: NeedDraft) {
+        let trimmed = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            discard(draft)
+            return
         }
-        return AppModel(preview: [
-            item("1", "Reply to Alisher about admin roles", due: -2,
-                 note: NoteCodec.append("He pinged again on Slack.", to: NoteCodec.append("Waiting on the role matrix.", to: nil))),
-            item("2", "Update CV after Macy's", due: -1),
-            item("3", "Review meal location association order", list: "tripleseat", color: "#EC4899", due: 0,
-                 note: "Check the sort order regression first."),
-            item("4", "Book dentist", due: 0),
-            item("5", "Prepare tab extension for team", list: "T3", color: "#6366F1", due: 2),
-            item("6", "Renew passport", due: 6, note: "Photos are already done."),
-            item("7", "Assess Microsoft Keycloak login", due: -1, done: true),
-            item("8", "Use Tailscale alias in artifacts", due: 0, done: true),
-        ])
+        if let index = drafts.firstIndex(where: { $0.id == draft.id }) {
+            drafts[index] = draft
+        } else {
+            drafts.insert(draft, at: 0)
+        }
+    }
+
+    func discard(_ draft: NeedDraft) {
+        drafts.removeAll { $0.id == draft.id }
+    }
+
+    /// Creates the need. Capture always sets a due date (today) so it is
+    /// immediately visible; undated needs are invisible by design.
+    func send(_ draft: NeedDraft) async {
+        let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+        discard(draft)
+        if isPreview {
+            let list = previewLists.first { $0.id == draft.listID } ?? previewLists.first
+            previewReplace(nil, with: ReminderSnapshot(
+                id: UUID().uuidString, listID: list?.id ?? "preview",
+                listTitle: list?.title ?? "Inbox", listColorHex: list?.colorHex,
+                title: title, dueDate: Calendar.current.startOfDay(for: .now), creationDate: .now
+            ))
+            return
+        }
+        // Fall back to a list the active filter can actually show.
+        let target = draft.listID.flatMap(store.list(withIdentifier:)) ?? selectedCalendars()?.first
+        try? store.createReminder(title: title, due: .now, in: target)
+        await refresh()
     }
 
     // MARK: List selection persistence
@@ -223,6 +251,57 @@ final class AppModel {
         selectedListIDs = Set(stored)
     }
 
+    private static func hex(_ cgColor: CGColor?) -> String? {
+        guard let components = cgColor?.components, components.count >= 3 else { return nil }
+        let channel = { (value: CGFloat) in Int((value * 255).rounded()) }
+        return String(format: "#%02X%02X%02X", channel(components[0]), channel(components[1]), channel(components[2]))
+    }
+
+    // MARK: Preview support
+
+    /// Re-runs classification over the in-memory set after a local mutation.
+    private func previewReplace(_ old: ReminderSnapshot?, with new: ReminderSnapshot) {
+        var all = inbox + snoozed + settled
+        if let old { all.removeAll { $0.id == old.id } }
+        all.append(new)
+        let sections = engine.sections(from: all, today: .now)
+        inbox = sections.inbox
+        snoozed = sections.snoozed
+        settled = all.filter(\.isCompleted)
+            .sorted { ($0.completionDate ?? .distantPast) > ($1.completionDate ?? .distantPast) }
+    }
+
+    static func preview() -> AppModel {
+        let day: (Int) -> Date = { Calendar.current.date(byAdding: .day, value: $0, to: Calendar.current.startOfDay(for: .now))! }
+        let lists = [
+            ListOption(id: "reminders", title: "Reminders", colorHex: "#3B82F6"),
+            ListOption(id: "tripleseat", title: "tripleseat", colorHex: "#EC4899"),
+            ListOption(id: "t3", title: "T3", colorHex: "#6366F1"),
+        ]
+        func item(_ id: String, _ title: String, list: ListOption = lists[0],
+                  due: Int, note: String? = nil, done: Bool = false) -> ReminderSnapshot {
+            ReminderSnapshot(
+                id: id, listID: list.id, listTitle: list.title, listColorHex: list.colorHex, title: title,
+                dueDate: day(due), isCompleted: done, completionDate: done ? day(0) : nil,
+                creationDate: day(-5), note: note
+            )
+        }
+        let model = AppModel(preview: [
+            item("1", "Reply to Alisher about admin roles", due: -2,
+                 note: NoteCodec.append("He pinged again on Slack.", to: NoteCodec.append("Waiting on the role matrix.", to: nil))),
+            item("2", "Update CV after Macy's", due: -1),
+            item("3", "Review meal location association order", list: lists[1], due: 0,
+                 note: "Check the sort order regression first."),
+            item("4", "Book dentist", due: 0),
+            item("5", "Prepare tab extension for team", list: lists[2], due: 2),
+            item("6", "Renew passport", due: 6, note: "Photos are already done."),
+            item("7", "Assess Microsoft Keycloak login", due: -1, done: true),
+            item("8", "Use Tailscale alias in artifacts", due: 0, done: true),
+        ], lists: lists)
+        model.drafts = [NeedDraft(id: UUID(), title: "Ask about the Keycloak migration window", listID: "reminders")]
+        return model
+    }
+
     // MARK: Simulator seed data
 
     private func seedSimulatorDataIfNeeded() async {
@@ -231,7 +310,7 @@ final class AppModel {
         guard !UserDefaults.standard.bool(forKey: seededKey) else { return }
         UserDefaults.standard.set(true, forKey: seededKey)
 
-        guard let list = store.store.defaultCalendarForNewReminders() ?? lists.first else { return }
+        guard let list = store.store.defaultCalendarForNewReminders() ?? store.lists.first else { return }
         let today = Date.now
         let calendar = Calendar.current
         let day: (Int) -> Date = { calendar.date(byAdding: .day, value: $0, to: today)! }

@@ -4,30 +4,73 @@ import SwiftUI
 struct InboxView: View {
     @Environment(AppModel.self) private var model
 
+    @State private var path: [String] = []
     @State private var snoozeTarget: ReminderSnapshot?
-    @State private var showCapture = false
     @State private var showFilter = false
     @State private var snoozedExpanded = false
     @State private var settledExpanded = false
     @State private var settledShown = 5
+
+    // Compose sheet state. `composeOutcome` distinguishes an explicit
+    // send/discard from a swipe-down, which stashes the draft.
+    @State private var composing = false
+    @State private var draft = NeedDraft(id: UUID(), title: "", listID: nil)
+    @State private var composeOutcome: ComposeOutcome = .dismissed
 
     private var inbox: [ReminderSnapshot] { model.inbox.filter(model.matchesSearch) }
     private var snoozed: [ReminderSnapshot] { model.snoozed.filter(model.matchesSearch) }
     private var settled: [ReminderSnapshot] { model.settled.filter(model.matchesSearch) }
 
     var body: some View {
-        NavigationStack {
+        @Bindable var model = model
+        NavigationStack(path: $path) {
             List {
+                ForEach(model.drafts) { draft in
+                    draftRow(draft)
+                }
                 inboxSection
-                if !snoozed.isEmpty { snoozedSection }
-                if !settled.isEmpty { settledSection }
+                if !snoozed.isEmpty {
+                    collapsible("Snoozed (\(snoozed.count))", isExpanded: $snoozedExpanded, tint: .accentColor) {
+                        ForEach(snoozed) { row($0, triageable: true) }
+                    }
+                }
+                if !settled.isEmpty {
+                    collapsible("Settled", isExpanded: $settledExpanded, tint: .secondary) {
+                        ForEach(settled.prefix(settledShown)) { row($0, triageable: false) }
+                        if settled.count > settledShown {
+                            showMore
+                        }
+                    }
+                }
             }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Inbox")
-            .navigationDestination(for: ReminderSnapshot.self) { snapshot in
-                ThreadView(reminderID: snapshot.id)
+            .listStyle(.plain)
+            .listSectionSeparator(.hidden, edges: .top)
+            .toolbar(.hidden, for: .navigationBar)
+            .searchable(text: $model.searchText, prompt: "Search")
+            .toolbar {
+                ToolbarItem(placement: .bottomBar) {
+                    Button {
+                        showFilter = true
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease")
+                    }
+                    .accessibilityLabel("Filter lists")
+                }
+                ToolbarSpacer(.flexible, placement: .bottomBar)
+                DefaultToolbarItem(kind: .search, placement: .bottomBar)
+                ToolbarSpacer(.flexible, placement: .bottomBar)
+                ToolbarItem(placement: .bottomBar) {
+                    Button {
+                        compose(model.newDraft())
+                    } label: {
+                        Image(systemName: "square.and.pencil")
+                    }
+                    .accessibilityLabel("New need")
+                }
             }
-            .safeAreaInset(edge: .bottom) { bottomBar }
+            .navigationDestination(for: String.self) { id in
+                ThreadView(reminderID: id)
+            }
         }
         .confirmationDialog(
             "Snooze until",
@@ -44,74 +87,60 @@ struct InboxView: View {
                 }
             }
         }
-        .sheet(isPresented: $showCapture) { CaptureSheet() }
+        .sheet(isPresented: $composing, onDismiss: finishCompose) {
+            CaptureSheet(draft: $draft, outcome: $composeOutcome)
+        }
         .sheet(isPresented: $showFilter) { FilterSheet() }
         .refreshable { await model.refresh() }
         .sensoryFeedback(.success, trigger: model.triageCount)
     }
 
-    // MARK: Sections
+    // MARK: Compose lifecycle
+
+    private func compose(_ target: NeedDraft) {
+        draft = target
+        composeOutcome = .dismissed
+        composing = true
+    }
+
+    private func finishCompose() {
+        switch composeOutcome {
+        case .dismissed: model.stash(draft)
+        case .discarded: model.discard(draft)
+        case .sent: Task { await model.send(draft) }
+        }
+    }
+
+    // MARK: Rows
 
     @ViewBuilder private var inboxSection: some View {
-        if inbox.isEmpty {
-            if model.searchText.isEmpty {
-                ContentUnavailableView(
-                    "Inbox Zero",
-                    systemImage: "checkmark.circle",
-                    description: Text("Nothing due. Enjoy the quiet.")
-                )
-                .listRowBackground(Color.clear)
-            } else {
-                ContentUnavailableView.search(text: model.searchText)
-                    .listRowBackground(Color.clear)
+        if inbox.isEmpty && model.drafts.isEmpty {
+            Group {
+                if model.searchText.isEmpty {
+                    ContentUnavailableView(
+                        "Inbox Zero",
+                        systemImage: "checkmark.circle",
+                        description: Text("Nothing due. Enjoy the quiet.")
+                    )
+                } else {
+                    ContentUnavailableView.search(text: model.searchText)
+                }
             }
+            .listRowSeparator(.hidden)
         } else {
-            Section {
-                ForEach(inbox) { snapshot in
-                    row(snapshot, triageable: true)
-                }
-            }
-        }
-    }
-
-    private var snoozedSection: some View {
-        Section {
-            DisclosureGroup(isExpanded: $snoozedExpanded) {
-                ForEach(snoozed) { snapshot in
-                    row(snapshot, triageable: true)
-                }
-            } label: {
-                Text("Snoozed (\(snoozed.count))")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.tint)
-            }
-        }
-    }
-
-    private var settledSection: some View {
-        Section {
-            DisclosureGroup(isExpanded: $settledExpanded) {
-                ForEach(settled.prefix(settledShown)) { snapshot in
-                    row(snapshot, triageable: false)
-                }
-                if settled.count > settledShown {
-                    Button("Show more (\(settled.count - settledShown) hidden)") {
-                        settledShown += 25
-                    }
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                }
-            } label: {
-                Text("Settled")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
-            }
+            ForEach(inbox) { row($0, triageable: true) }
         }
     }
 
     private func row(_ snapshot: ReminderSnapshot, triageable: Bool) -> some View {
-        NavigationLink(value: snapshot) {
-            ReminderRow(snapshot: snapshot)
+        Button {
+            path.append(snapshot.id)
+        } label: {
+            Text(snapshot.title)
+                .lineLimit(2)
+                .foregroundStyle(snapshot.isCompleted ? .secondary : .primary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 6)
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: triageable) {
             if triageable {
@@ -131,86 +160,85 @@ struct InboxView: View {
         }
     }
 
-    // MARK: Bottom bar
-
-    private var bottomBar: some View {
-        @Bindable var model = model
-        return HStack(spacing: 12) {
-            Button {
-                showFilter = true
-            } label: {
-                Image(systemName: "line.3.horizontal.decrease")
-                    .frame(width: 44, height: 44)
-                    .background(.regularMaterial, in: Circle())
-            }
-            .accessibilityLabel("Filter lists")
-
-            HStack {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                TextField("Search", text: $model.searchText)
-                    .textFieldStyle(.plain)
-                if !model.searchText.isEmpty {
-                    Button {
-                        model.searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .padding(.horizontal, 14)
-            .frame(height: 44)
-            .background(.regularMaterial, in: Capsule())
-
-            Button {
-                showCapture = true
-            } label: {
-                Image(systemName: "square.and.pencil")
-                    .frame(width: 44, height: 44)
-                    .background(.regularMaterial, in: Circle())
-            }
-            .accessibilityLabel("New reminder")
-        }
-        .padding(.horizontal)
-        .padding(.bottom, 4)
-    }
-}
-
-struct ReminderRow: View {
-    let snapshot: ReminderSnapshot
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Circle()
-                .fill(Color(hexString: snapshot.listColorHex) ?? .accentColor)
-                .frame(width: 10, height: 10)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(snapshot.title)
-                    .lineLimit(1)
-                    .foregroundStyle(snapshot.isCompleted ? .secondary : .primary)
-                Text(snapshot.listTitle)
-                    .font(.caption)
+    private func draftRow(_ draft: NeedDraft) -> some View {
+        Button {
+            compose(draft)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "pencil.line")
                     .foregroundStyle(.secondary)
+                Text(draft.title)
+                    .italic()
+                    .lineLimit(2)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("Draft")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .overlay(Capsule().strokeBorder(.quaternary))
             }
-            Spacer()
-            Text(timeLabel)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(timeColor)
+            .padding(.vertical, 6)
         }
-        .padding(.vertical, 2)
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive) {
+                model.discard(draft)
+            } label: {
+                Label("Discard", systemImage: "trash")
+            }
+        }
     }
 
-    private var timeLabel: String {
-        if snapshot.isCompleted {
-            return snapshot.completionDate.map { RelativeLabel.since($0) } ?? ""
+    private func collapsible<Content: View>(
+        _ title: String,
+        isExpanded: Binding<Bool>,
+        tint: Color,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        Group {
+            Button {
+                withAnimation(.snappy) { isExpanded.wrappedValue.toggle() }
+            } label: {
+                HStack(spacing: 10) {
+                    Text(title)
+                        .font(.subheadline.weight(.medium))
+                    Rectangle()
+                        .fill(tint.opacity(0.35))
+                        .frame(height: 1)
+                    Image(systemName: isExpanded.wrappedValue ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                }
+                .foregroundStyle(tint)
+                .padding(.vertical, 8)
+            }
+            .listRowSeparator(.hidden)
+            if isExpanded.wrappedValue {
+                content()
+            }
         }
-        return snapshot.dueDate.map { RelativeLabel.due($0) } ?? ""
     }
 
-    private var timeColor: Color {
-        guard !snapshot.isCompleted, let due = snapshot.dueDate else { return .secondary }
-        return due < Calendar.current.startOfDay(for: .now) ? .red : .secondary
+    private var showMore: some View {
+        Button {
+            settledShown += 25
+        } label: {
+            Text("Show more (\(settled.count - settledShown) hidden)")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+                        .foregroundStyle(.quaternary)
+                )
+        }
+        .listRowSeparator(.hidden)
     }
 }
+
+enum ComposeOutcome { case dismissed, discarded, sent }
 
 #Preview("Inbox") {
     InboxView().environment(AppModel.preview())

@@ -1,13 +1,15 @@
 import InboxCore
 import SwiftUI
 
-/// The main surface: the reminder's note rendered as an append-only log.
+/// The main surface: the need's note rendered as an append-only log.
 /// History is read-only here; editing past messages happens in the native app.
 struct ThreadView: View {
     @Environment(AppModel.self) private var model
     let reminderID: String
 
     @State private var draft = ""
+    @State private var titleDraft = ""
+    @FocusState private var titleFocused: Bool
     @FocusState private var inputFocused: Bool
 
     private var snapshot: ReminderSnapshot? { model.snapshot(id: reminderID) }
@@ -17,6 +19,9 @@ struct ThreadView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 10) {
+                        titleField
+                            .padding(.bottom, 8)
+
                         let messages = snapshot?.messages ?? []
                         if messages.isEmpty {
                             Text("No notes yet. Leave a thought for your future self.")
@@ -42,6 +47,7 @@ struct ThreadView: View {
                     withAnimation { proxy.scrollTo(count - 1, anchor: .bottom) }
                 }
                 .onAppear {
+                    titleDraft = snapshot?.title ?? ""
                     let count = snapshot?.messages.count ?? 0
                     guard count > 0 else { return }
                     proxy.scrollTo(count - 1, anchor: .bottom)
@@ -50,42 +56,63 @@ struct ThreadView: View {
 
             inputBar
         }
-        .navigationTitle(snapshot?.title ?? "")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            if let snapshot, !snapshot.isCompleted {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        Task { await model.settle(snapshot) }
-                    } label: {
-                        Image(systemName: "checkmark.circle")
-                    }
-                    .accessibilityLabel("Settle")
-                }
-            }
-        }
+        .toolbar(.visible, for: .navigationBar)
+        // Deliberately no Settle here: completing a need is only ever the
+        // swipe gesture in the list, to build the habit.
     }
 
-    private var inputBar: some View {
-        HStack(spacing: 8) {
-            TextField("Message to your future self", text: $draft, axis: .vertical)
-                .lineLimit(1...5)
-                .focused($inputFocused)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 9)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20))
-            Button {
-                send()
-            } label: {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.title2)
+    /// The need's title, editable in place. Commits on return or when focus leaves.
+    private var titleField: some View {
+        TextField("Title", text: $titleDraft, axis: .vertical)
+            .font(.title2.weight(.semibold))
+            .lineLimit(1...3)
+            .focused($titleFocused)
+            .submitLabel(.done)
+            .onSubmit(commitTitle)
+            .onChange(of: titleFocused) { _, focused in
+                if !focused { commitTitle() }
             }
-            .disabled(sanitizedDraft.isEmpty)
-            .accessibilityLabel("Append message")
+            .onChange(of: snapshot?.title ?? "") { _, title in
+                if !titleFocused { titleDraft = title }
+            }
+            .accessibilityLabel("Need title")
+    }
+
+    private func commitTitle() {
+        guard let snapshot else { return }
+        let trimmed = titleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            titleDraft = snapshot.title
+            return
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(.bar)
+        Task { await model.rename(snapshot, to: trimmed) }
+    }
+
+    /// Multiline composer with the send control anchored to the bottom edge.
+    private var inputBar: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            TextField("Message to your future self", text: $draft, axis: .vertical)
+                .lineLimit(1...8)
+                .focused($inputFocused)
+            HStack {
+                Spacer()
+                Button(action: send) {
+                    Image(systemName: "arrow.up")
+                        .font(.body.weight(.semibold))
+                        .frame(width: 34, height: 34)
+                        .background(sanitizedDraft.isEmpty ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.tint), in: Circle())
+                        .foregroundStyle(sanitizedDraft.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.white))
+                }
+                .buttonStyle(.plain)
+                .disabled(sanitizedDraft.isEmpty)
+                .accessibilityLabel("Append message")
+            }
+        }
+        .padding(14)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
     }
 
     /// U+2063 is invisible and not in .whitespacesAndNewlines — without

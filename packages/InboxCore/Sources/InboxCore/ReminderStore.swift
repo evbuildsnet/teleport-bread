@@ -79,6 +79,12 @@ public final class ReminderStore {
         try store.save(reminder, commit: true)
     }
 
+    public func rename(id: String, title: String) throws {
+        guard let reminder = liveReminder(id) else { throw ReminderStoreError.notFound }
+        reminder.title = title
+        try store.save(reminder, commit: true)
+    }
+
     public func appendMessage(id: String, message: String) throws {
         guard let reminder = liveReminder(id) else { throw ReminderStoreError.notFound }
         reminder.notes = NoteCodec.append(message, to: reminder.notes)
