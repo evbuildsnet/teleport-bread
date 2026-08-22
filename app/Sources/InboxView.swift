@@ -17,6 +17,12 @@ struct InboxView: View {
     @State private var draft = NeedDraft(id: UUID(), title: "", listID: nil)
     @State private var composeOutcome: ComposeOutcome = .dismissed
 
+    // Pull-down-to-add: overscroll distance drives the hint; releasing past
+    // the threshold opens the compose sheet.
+    @State private var pullProgress: Double = 0
+    @State private var pullArmed = false
+    private let pullThreshold: CGFloat = 96
+
     private var drafts: [NeedDraft] { model.drafts.filter(model.matchesSearch) }
     private var inbox: [ReminderSnapshot] { model.inbox.filter(model.matchesSearch) }
     private var snoozed: [ReminderSnapshot] { model.snoozed.filter(model.matchesSearch) }
@@ -46,6 +52,19 @@ struct InboxView: View {
                 }
             }
             .listStyle(.plain)
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                max(0, -(geometry.contentOffset.y + geometry.contentInsets.top))
+            } action: { _, overscroll in
+                pullProgress = min(1, overscroll / pullThreshold)
+                pullArmed = overscroll >= pullThreshold
+            }
+            .onScrollPhaseChange { previous, next in
+                guard previous == .interacting, next != .interacting, pullArmed else { return }
+                pullArmed = false
+                compose(model.newDraft())
+            }
+            .overlay(alignment: .top) { pullHint }
+            .sensoryFeedback(.impact(weight: .light), trigger: pullArmed) { _, armed in armed }
             .toolbar(.hidden, for: .navigationBar)
             .searchable(text: $model.searchText, prompt: "Search")
             .toolbar {
@@ -77,8 +96,23 @@ struct InboxView: View {
             CaptureSheet(draft: $draft, outcome: $composeOutcome, mode: .create)
         }
         .sheet(isPresented: $showFilter) { FilterSheet() }
-        .refreshable { await model.refresh() }
         .sensoryFeedback(.success, trigger: model.triageCount)
+    }
+
+    /// Rides in the overscroll area: fades in with the pull, flips copy when armed.
+    private var pullHint: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "square.and.pencil")
+                .rotationEffect(.degrees(pullArmed ? 0 : -90 * (1 - pullProgress)))
+            Text(pullArmed ? "Release to add a need" : "Keep pulling to add a need")
+        }
+        .font(.footnote.weight(.medium))
+        .foregroundStyle(pullArmed ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+        .padding(.top, 8)
+        .opacity(pullProgress)
+        .scaleEffect(0.9 + 0.1 * pullProgress)
+        .animation(.snappy(duration: 0.2), value: pullArmed)
+        .allowsHitTesting(false)
     }
 
     // MARK: Compose lifecycle
@@ -136,20 +170,18 @@ struct InboxView: View {
         .listRowSeparator(.hidden, edges: .top)
         .listRowSeparator(compact ? .hidden : .visible, edges: .bottom)
         .listRowSeparatorTint(.primary.opacity(0.08))
-        .swipeActions(edge: .trailing, allowsFullSwipe: placement != .settled) {
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             switch placement {
             case .inbox:
                 settleButton(snapshot)
                 snoozeButton(snapshot)
             case .snoozed:
-                settleButton(snapshot)
                 Button {
                     Task { await model.wake(snapshot) }
                 } label: {
                     Label("Wake", systemImage: "sun.max")
                 }
-                .tint(.orange)
-                snoozeButton(snapshot)
+                .tint(.blue)
             case .settled:
                 Button {
                     Task { await model.unsettle(snapshot) }

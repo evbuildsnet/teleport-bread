@@ -38,16 +38,16 @@ struct ThreadView: View {
                                 .padding(.top, 40)
                         }
                         ForEach(Array(messages.enumerated()), id: \.offset) { index, message in
-                            Text(message)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 10)
-                                .background(
-                                    editingIndex == index ? AnyShapeStyle(.tint.opacity(0.15)) : AnyShapeStyle(.quaternary.opacity(0.5)),
-                                    in: RoundedRectangle(cornerRadius: 14)
-                                )
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .id(index)
-                                .contextMenu {
+                            HStack(alignment: .bottom, spacing: 6) {
+                                Text(message)
+                                    .textSelection(.enabled)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 10)
+                                    .background(
+                                        editingIndex == index ? AnyShapeStyle(.tint.opacity(0.15)) : AnyShapeStyle(.quaternary.opacity(0.5)),
+                                        in: RoundedRectangle(cornerRadius: 14)
+                                    )
+                                Menu {
                                     Button {
                                         beginEditing(index, message)
                                     } label: {
@@ -64,7 +64,17 @@ struct ThreadView: View {
                                     } label: {
                                         Label("Delete", systemImage: "trash")
                                     }
+                                } label: {
+                                    Image(systemName: "ellipsis")
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 28, height: 28)
+                                        .contentShape(Rectangle())
                                 }
+                                .accessibilityLabel("Message actions")
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .id(index)
                         }
                     }
                     .padding()

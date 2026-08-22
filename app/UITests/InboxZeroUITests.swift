@@ -100,7 +100,10 @@ final class InboxZeroUITests: XCTestCase {
         XCTAssertTrue(scrollTo(item(title)),
                       "snoozed reminder should be listed under Snoozed")
 
-        // Cleanup: settle it from the Snoozed section.
+        // Snoozed rows only offer Wake; wake it back to today, then settle.
+        swipeAndTap(title, action: "Wake")
+        app.swipeDown()
+        XCTAssertTrue(scrollTo(item(title)), "woken reminder should be back in the inbox")
         swipeAndTap(title, action: "Settle")
         XCTAssertTrue(waitForDisappearance(of: item(title)))
     }
@@ -119,10 +122,10 @@ final class InboxZeroUITests: XCTestCase {
         XCTAssertTrue(item(message).waitForExistence(timeout: 5),
                       "appended message should render in the thread")
 
-        // Long-press exposes the explicit history-edit menu.
-        item(message).press(forDuration: 1.0)
-        XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 3), "context menu should offer Edit")
-        XCTAssertTrue(app.buttons["Delete"].exists, "context menu should offer Delete")
+        // The "…" menu exposes the explicit history-edit actions.
+        app.buttons["Message actions"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 3), "menu should offer Edit")
+        XCTAssertTrue(app.buttons["Delete"].exists, "menu should offer Delete")
         app.buttons["Copy"].tap()
 
         // Relaunch: the message must come back from EventKit, not app state.
