@@ -119,6 +119,12 @@ final class InboxZeroUITests: XCTestCase {
         XCTAssertTrue(item(message).waitForExistence(timeout: 5),
                       "appended message should render in the thread")
 
+        // Long-press exposes the explicit history-edit menu.
+        item(message).press(forDuration: 1.0)
+        XCTAssertTrue(app.buttons["Edit"].waitForExistence(timeout: 3), "context menu should offer Edit")
+        XCTAssertTrue(app.buttons["Delete"].exists, "context menu should offer Delete")
+        app.buttons["Copy"].tap()
+
         // Relaunch: the message must come back from EventKit, not app state.
         app.terminate()
         app.launch()

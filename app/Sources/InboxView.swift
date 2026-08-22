@@ -133,8 +133,8 @@ struct InboxView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, compact ? 2 : 6)
         }
-        .listRowSeparator(compact ? .hidden : .visible)
         .listRowSeparator(.hidden, edges: .top)
+        .listRowSeparator(compact ? .hidden : .visible, edges: .bottom)
         .listRowSeparatorTint(.primary.opacity(0.08))
         .swipeActions(edge: .trailing, allowsFullSwipe: placement != .settled) {
             switch placement {
