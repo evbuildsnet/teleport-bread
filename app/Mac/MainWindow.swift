@@ -23,9 +23,10 @@ struct MainWindow: View {
                     .background(Theme.canvas)
             }
         }
+        .ignoresSafeArea()
         .overlay { if ui.paletteOpen { CommandPalette() } }
-        .onChange(of: model.phase) { _, phase in
-            guard phase == .ready, ui.selection == nil, let first = model.inbox.first else { return }
+        .onChange(of: model.inbox.isEmpty, initial: true) { _, _ in
+            guard ui.selection == nil, let first = model.inbox.first else { return }
             ui.selection = .need(first.id)
         }
     }

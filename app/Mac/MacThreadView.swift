@@ -225,6 +225,7 @@ struct Composer<Accessory: View, Footer: View>: View {
     var sendSymbol = "arrow.up"
     let canSend: Bool
     let onSend: () -> Void
+    @State private var editorHeight: CGFloat = 20
 
     init(
         text: Binding<String>,
@@ -254,9 +255,9 @@ struct Composer<Accessory: View, Footer: View>: View {
                 Text(text.isEmpty ? " " : text + "\u{200B}")
                     .font(.system(size: 14))
                     .lineSpacing(2)
-                    .padding(.vertical, 0)
                     .opacity(0)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { editorHeight = $0 }
                 TextEditor(text: $text)
                     .font(.system(size: 14))
                     .lineSpacing(2)
@@ -264,6 +265,7 @@ struct Composer<Accessory: View, Footer: View>: View {
                     .scrollDisabled(true)
                     .focused(focused)
                     .padding(.horizontal, -5)
+                    .frame(height: min(editorHeight + 4, 200))
                     .onKeyPress(.return, phases: .down) { press in
                         if press.modifiers.contains(.shift) { return .ignored }
                         if canSend { onSend() }
@@ -277,7 +279,6 @@ struct Composer<Accessory: View, Footer: View>: View {
                         .allowsHitTesting(false)
                 }
             }
-            .frame(maxHeight: 200)
             HStack(alignment: .center) {
                 footer
                 Spacer()

@@ -66,6 +66,7 @@ struct MacRootView: View {
                 MainWindow()
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .frame(minWidth: Theme.sidebarMinWidth + Theme.mainMinWidth, minHeight: 620)
         .background(Theme.canvas)
         .task { await model.start() }

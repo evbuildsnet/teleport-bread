@@ -54,11 +54,8 @@ targets:
         NSRemindersUsageDescription: "InboxZero is a triage surface over your existing reminders."
         LSApplicationCategoryType: public.app-category.productivity
         NSHumanReadableCopyright: ""
-    entitlements:
-      path: Mac/InboxZeroMac.entitlements
-      properties:
-        com.apple.security.app-sandbox: true
-        com.apple.security.personal-information.reminders: true
+    # No App Sandbox for now: on macOS 26 the sandboxed dev build's Reminders
+    # request dies in calaccessd (XPC 4099) before any consent dialog.
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.ev.inboxzero.mac
