@@ -14,6 +14,14 @@ public enum NoteCodec {
         return note.components(separatedBy: separator)
     }
 
+    /// Rebuilds a note from messages (used when the user explicitly edits or
+    /// deletes a message). Empty result → nil note.
+    public static func join(_ messages: [String]) -> String? {
+        let clean = messages.map { $0.replacingOccurrences(of: String(invisibleSeparator), with: "") }
+        guard !clean.isEmpty else { return nil }
+        return clean.joined(separator: separator)
+    }
+
     /// Appends a message to the log. U+2063 is stripped from the new message
     /// so pasted input can never forge a message boundary; the character is
     /// invisible, so stripping it does not alter what the user sees.

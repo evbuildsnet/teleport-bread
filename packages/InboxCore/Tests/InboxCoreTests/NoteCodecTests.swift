@@ -41,6 +41,13 @@ import Testing
         #expect(messages[1] == "before\n\nafter")
     }
 
+    @Test func joinRoundtripsAndStripsForgedMarkers() {
+        let messages = ["one", "two\nlines", "three\(NoteCodec.separator)forged"]
+        let note = NoteCodec.join(messages)
+        #expect(NoteCodec.parse(note) == ["one", "two\nlines", "three\n\nforged"])
+        #expect(NoteCodec.join([]) == nil)
+    }
+
     @Test func separatorRendersAsBlankLineWithoutMarker() {
         // What the native app shows if U+2063 were stripped: still a paragraph break.
         let note = NoteCodec.append("b", to: "a")

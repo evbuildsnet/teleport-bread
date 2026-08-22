@@ -1,37 +1,65 @@
 import InboxCore
 import SwiftUI
 
-/// Half-height compose sheet. Discard clears the draft; send creates the
-/// need; swiping the sheet away keeps the draft in memory (see InboxView).
+/// Half-height sheet used both to create a need and to edit its title/list.
+/// Create mode: Discard clears the draft; send creates; swipe-down stashes the
+/// draft (see InboxView). Edit mode: Cancel and swipe-down both leave the
+/// need untouched.
 struct CaptureSheet: View {
+    enum Mode { case create, edit }
+
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @Binding var draft: NeedDraft
     @Binding var outcome: ComposeOutcome
+    let mode: Mode
     @FocusState private var focused: Bool
 
     private var canSend: Bool {
         !draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private var selectedList: ListOption? {
+        model.listOptions.first { $0.id == draft.listID } ?? model.listOptions.first
+    }
+
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 20) {
-                TextField("What do you need?", text: $draft.title, axis: .vertical)
+            VStack(alignment: .leading, spacing: 14) {
+                TextField("What do you need?", text: $draft.title)
                     .font(.title3)
-                    .lineLimit(1...4)
                     .focused($focused)
-                    .submitLabel(.send)
+                    .submitLabel(mode == .create ? .send : .done)
                     .onSubmit(send)
+                    .accessibilityLabel("Need title")
 
                 if !model.listOptions.isEmpty {
-                    Picker("List", selection: $draft.listID) {
+                    Menu {
                         ForEach(model.listOptions) { option in
-                            Text(option.title).tag(Optional(option.id))
+                            Button {
+                                draft.listID = option.id
+                            } label: {
+                                if option.id == selectedList?.id {
+                                    Label(option.title, systemImage: "checkmark")
+                                } else {
+                                    Text(option.title)
+                                }
+                            }
                         }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("Save to list:")
+                                .foregroundStyle(.secondary)
+                            Text(selectedList?.title ?? "")
+                                .fontWeight(.medium)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .font(.footnote)
                     }
-                    .pickerStyle(.menu)
-                    .tint(.secondary)
+                    .tint(.primary)
+                    .accessibilityLabel("Save to list")
                 }
                 Spacer(minLength: 0)
             }
@@ -39,17 +67,17 @@ struct CaptureSheet: View {
             .padding(.top, 12)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Discard", role: .destructive) {
+                    Button(mode == .create ? "Discard" : "Cancel", role: .destructive) {
                         outcome = .discarded
                         dismiss()
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(action: send) {
-                        Image(systemName: "paperplane.fill")
+                        Image(systemName: mode == .create ? "paperplane.fill" : "checkmark")
                     }
                     .disabled(!canSend)
-                    .accessibilityLabel("Create need")
+                    .accessibilityLabel(mode == .create ? "Create need" : "Save need")
                 }
             }
             .onAppear { focused = true }

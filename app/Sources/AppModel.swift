@@ -124,11 +124,18 @@ final class AppModel {
         return calendars.isEmpty ? nil : calendars
     }
 
+    var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespaces).isEmpty }
+
     func matchesSearch(_ snapshot: ReminderSnapshot) -> Bool {
         let query = searchText.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return true }
         return snapshot.title.localizedCaseInsensitiveContains(query)
             || (snapshot.note?.localizedCaseInsensitiveContains(query) ?? false)
+    }
+
+    func matchesSearch(_ draft: NeedDraft) -> Bool {
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        return query.isEmpty || draft.title.localizedCaseInsensitiveContains(query)
     }
 
     func snapshot(id: String) -> ReminderSnapshot? {
@@ -151,13 +158,34 @@ final class AppModel {
     }
 
     func snooze(_ snapshot: ReminderSnapshot, _ preset: SnoozePreset) async {
-        let date = engine.snoozeDate(preset, from: .now)
+        await snooze(snapshot, until: engine.snoozeDate(preset, from: .now))
+    }
+
+    /// Moves the need to the given day and makes it active (reopens settled).
+    func snooze(_ snapshot: ReminderSnapshot, until date: Date) async {
+        let day = Calendar.current.startOfDay(for: date)
         if isPreview {
-            previewReplace(snapshot, with: snapshot.with(dueDate: date))
+            previewReplace(snapshot, with: snapshot.with(dueDate: day, isCompleted: false, completionDate: .some(nil)))
             triageCount += 1
             return
         }
-        guard (try? store.snooze(id: snapshot.id, to: date)) != nil else { return }
+        guard (try? store.snooze(id: snapshot.id, to: day)) != nil else { return }
+        triageCount += 1
+        await refresh()
+    }
+
+    /// Wake = bring a snoozed need back to today.
+    func wake(_ snapshot: ReminderSnapshot) async {
+        await snooze(snapshot, until: .now)
+    }
+
+    func unsettle(_ snapshot: ReminderSnapshot) async {
+        if isPreview {
+            previewReplace(snapshot, with: snapshot.with(isCompleted: false, completionDate: .some(nil)))
+            triageCount += 1
+            return
+        }
+        guard (try? store.unsettle(id: snapshot.id)) != nil else { return }
         triageCount += 1
         await refresh()
     }
@@ -178,22 +206,60 @@ final class AppModel {
         return true
     }
 
-    func rename(_ snapshot: ReminderSnapshot, to title: String) async {
+    /// Edit title and/or list from the compose sheet in edit mode.
+    func update(_ snapshot: ReminderSnapshot, title: String, listID: String?) async {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, trimmed != snapshot.title else { return }
+        guard !trimmed.isEmpty else { return }
         if isPreview {
-            previewReplace(snapshot, with: snapshot.with(title: trimmed))
+            let list = previewLists.first { $0.id == listID }
+            previewReplace(snapshot, with: snapshot.with(
+                listID: list?.id, listTitle: list?.title, title: trimmed
+            ))
             return
         }
-        try? store.rename(id: snapshot.id, title: trimmed)
+        try? store.update(id: snapshot.id, title: trimmed, listID: listID)
+        await refresh()
+    }
+
+    /// Explicit history edits, requested by the user via long-press.
+    func replaceMessage(at index: Int, with text: String, in snapshot: ReminderSnapshot) async {
+        var messages = snapshot.messages
+        guard messages.indices.contains(index) else { return }
+        messages[index] = text
+        await setMessages(messages, in: snapshot)
+    }
+
+    func deleteMessage(at index: Int, in snapshot: ReminderSnapshot) async {
+        var messages = snapshot.messages
+        guard messages.indices.contains(index) else { return }
+        messages.remove(at: index)
+        await setMessages(messages, in: snapshot)
+    }
+
+    private func setMessages(_ messages: [String], in snapshot: ReminderSnapshot) async {
+        let note = NoteCodec.join(messages)
+        if isPreview {
+            previewReplace(snapshot, with: snapshot.with(note: .some(note)))
+            return
+        }
+        try? store.setNote(id: snapshot.id, note: note)
         await refresh()
     }
 
     // MARK: Drafts & capture
 
+    /// New drafts go to the last list used on this device, falling back to
+    /// the default (or first) list if that one no longer exists.
     func newDraft() -> NeedDraft {
-        NeedDraft(id: UUID(), title: "", listID: defaultListID)
+        let options = listOptions
+        let remembered = UserDefaults.standard.string(forKey: Self.lastListKey)
+        let listID = options.first { $0.id == remembered }?.id
+            ?? options.first { $0.id == defaultListID }?.id
+            ?? options.first?.id
+        return NeedDraft(id: UUID(), title: "", listID: listID)
     }
+
+    private static let lastListKey = "lastListID"
 
     /// Called when the compose sheet is swiped away: keep the work in memory.
     func stash(_ draft: NeedDraft) {
@@ -219,6 +285,7 @@ final class AppModel {
         let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return }
         discard(draft)
+        UserDefaults.standard.set(draft.listID, forKey: Self.lastListKey)
         if isPreview {
             let list = previewLists.first { $0.id == draft.listID } ?? previewLists.first
             previewReplace(nil, with: ReminderSnapshot(

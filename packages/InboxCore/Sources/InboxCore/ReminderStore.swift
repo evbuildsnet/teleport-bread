@@ -70,8 +70,10 @@ public final class ReminderStore {
         try store.save(reminder, commit: true)
     }
 
+    /// Snoozing (or waking) always yields an active need on the given day.
     public func snooze(id: String, to date: Date) throws {
         guard let reminder = liveReminder(id) else { throw ReminderStoreError.notFound }
+        reminder.isCompleted = false
         reminder.dueDateComponents = Self.dateOnlyComponents(from: date)
         // A stale absolute alarm would still fire at the old due time,
         // contradicting the snooze. Alarms belong to the due date.
@@ -79,9 +81,24 @@ public final class ReminderStore {
         try store.save(reminder, commit: true)
     }
 
-    public func rename(id: String, title: String) throws {
+    public func unsettle(id: String) throws {
+        guard let reminder = liveReminder(id) else { throw ReminderStoreError.notFound }
+        reminder.isCompleted = false
+        try store.save(reminder, commit: true)
+    }
+
+    public func update(id: String, title: String, listID: String?) throws {
         guard let reminder = liveReminder(id) else { throw ReminderStoreError.notFound }
         reminder.title = title
+        if let listID, let list = store.calendar(withIdentifier: listID), list != reminder.calendar {
+            reminder.calendar = list
+        }
+        try store.save(reminder, commit: true)
+    }
+
+    public func setNote(id: String, note: String?) throws {
+        guard let reminder = liveReminder(id) else { throw ReminderStoreError.notFound }
+        reminder.notes = note
         try store.save(reminder, commit: true)
     }
 

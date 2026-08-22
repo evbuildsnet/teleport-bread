@@ -44,6 +44,8 @@ public struct ReminderSnapshot: Identifiable, Hashable, Sendable {
 
     /// Copy with selected fields changed. Used by in-memory preview state.
     public func with(
+        listID: String? = nil,
+        listTitle: String? = nil,
         title: String? = nil,
         dueDate: Date?? = nil,
         isCompleted: Bool? = nil,
@@ -52,8 +54,8 @@ public struct ReminderSnapshot: Identifiable, Hashable, Sendable {
     ) -> ReminderSnapshot {
         ReminderSnapshot(
             id: id,
-            listID: listID,
-            listTitle: listTitle,
+            listID: listID ?? self.listID,
+            listTitle: listTitle ?? self.listTitle,
             listColorHex: listColorHex,
             title: title ?? self.title,
             dueDate: dueDate ?? self.dueDate,
