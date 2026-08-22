@@ -16,6 +16,8 @@ final class AppModel {
     var snoozed: [ReminderSnapshot] = []
     var settled: [ReminderSnapshot] = []
     var searchText = ""
+    /// Bumped on every successful triage action; drives haptic feedback.
+    private(set) var triageCount = 0
 
     /// nil = all lists. Persisted per device.
     var selectedListIDs: Set<String>? {
@@ -94,12 +96,14 @@ final class AppModel {
     // MARK: Actions
 
     func settle(_ snapshot: ReminderSnapshot) async {
-        try? store.settle(id: snapshot.id)
+        guard (try? store.settle(id: snapshot.id)) != nil else { return }
+        triageCount += 1
         await refresh()
     }
 
     func snooze(_ snapshot: ReminderSnapshot, _ preset: SnoozePreset) async {
-        try? store.snooze(id: snapshot.id, to: engine.snoozeDate(preset, from: .now))
+        guard (try? store.snooze(id: snapshot.id, to: engine.snoozeDate(preset, from: .now))) != nil else { return }
+        triageCount += 1
         await refresh()
     }
 

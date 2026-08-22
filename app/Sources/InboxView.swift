@@ -47,6 +47,7 @@ struct InboxView: View {
         .sheet(isPresented: $showCapture) { CaptureSheet() }
         .sheet(isPresented: $showFilter) { FilterSheet() }
         .refreshable { await model.refresh() }
+        .sensoryFeedback(.success, trigger: model.triageCount)
     }
 
     // MARK: Sections
