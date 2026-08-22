@@ -23,8 +23,47 @@ func print(_ message: String) {
     }
 }
 
+/// Read-only mode: parse every reminder in the spike list and make the
+/// separator visible, without creating anything.
+@MainActor
+func check() async {
+    let store = ReminderStore()
+    do {
+        guard try await store.requestAccess() else {
+            print("FAIL access: not granted")
+            exit(1)
+        }
+    } catch {
+        print("FAIL access: \(error)")
+        exit(1)
+    }
+    guard let list = store.lists.first(where: { $0.title == spikeListName }) else {
+        print("FAIL check: list '\(spikeListName)' not found")
+        exit(1)
+    }
+    let reminders = await store.fetchIncomplete(in: [list])
+    for reminder in reminders {
+        print("reminder: \(reminder.title)")
+        let messages = reminder.messages
+        print("messages: \(messages.count)")
+        for (index, message) in messages.enumerated() {
+            print("  [\(index)] \(message.replacingOccurrences(of: "\n", with: "\\n"))")
+        }
+        let visible = (reminder.note ?? "")
+            .replacingOccurrences(of: String(NoteCodec.invisibleSeparator), with: "<SEP>")
+            .replacingOccurrences(of: "\n", with: "\\n")
+        print("raw: \(visible)")
+    }
+    print("CHECK DONE (\(reminders.count) reminders)")
+    exit(0)
+}
+
 @MainActor
 func run() async {
+    if CommandLine.arguments.contains("--check") {
+        await check()
+        return
+    }
     let store = ReminderStore()
 
     do {
