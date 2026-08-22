@@ -70,6 +70,7 @@ struct ThreadView: View {
                                         .frame(width: 28, height: 22)
                                         .contentShape(Rectangle())
                                 }
+                                .tint(.primary)
                                 .accessibilityLabel("Message actions")
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
