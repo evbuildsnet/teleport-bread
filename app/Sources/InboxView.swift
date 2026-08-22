@@ -211,3 +211,7 @@ struct ReminderRow: View {
         return due < Calendar.current.startOfDay(for: .now) ? .red : .secondary
     }
 }
+
+#Preview("Inbox") {
+    InboxView().environment(AppModel.preview())
+}

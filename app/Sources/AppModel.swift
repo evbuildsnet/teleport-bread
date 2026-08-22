@@ -10,6 +10,22 @@ final class AppModel {
 
     private let store = ReminderStore()
     private let engine = InboxEngine()
+    /// Preview mode keeps all state in memory so SwiftUI canvases and design
+    /// iteration never touch EventKit.
+    private let isPreview: Bool
+
+    init() {
+        isPreview = false
+    }
+
+    private init(preview snapshots: [ReminderSnapshot]) {
+        isPreview = true
+        phase = .ready
+        let sections = engine.sections(from: snapshots, today: .now)
+        inbox = sections.inbox
+        snoozed = sections.snoozed
+        settled = snapshots.filter(\.isCompleted)
+    }
 
     var phase: Phase = .loading
     var inbox: [ReminderSnapshot] = []
@@ -32,7 +48,7 @@ final class AppModel {
     // MARK: Lifecycle
 
     func start() async {
-        guard !started else { return }
+        guard !started, !isPreview else { return }
         started = true
         switch store.authorizationStatus {
         case .fullAccess:
@@ -62,7 +78,7 @@ final class AppModel {
     // MARK: Data
 
     func refresh() async {
-        guard phase == .ready else { return }
+        guard phase == .ready, !isPreview else { return }
         let calendars = selectedCalendars()
         let sections = engine.sections(from: await store.fetchIncomplete(in: calendars), today: .now)
         inbox = sections.inbox
@@ -96,13 +112,24 @@ final class AppModel {
     // MARK: Actions
 
     func settle(_ snapshot: ReminderSnapshot) async {
+        if isPreview {
+            previewReplace(snapshot, with: snapshot.with(isCompleted: true, completionDate: .now))
+            triageCount += 1
+            return
+        }
         guard (try? store.settle(id: snapshot.id)) != nil else { return }
         triageCount += 1
         await refresh()
     }
 
     func snooze(_ snapshot: ReminderSnapshot, _ preset: SnoozePreset) async {
-        guard (try? store.snooze(id: snapshot.id, to: engine.snoozeDate(preset, from: .now))) != nil else { return }
+        let date = engine.snoozeDate(preset, from: .now)
+        if isPreview {
+            previewReplace(snapshot, with: snapshot.with(dueDate: date))
+            triageCount += 1
+            return
+        }
+        guard (try? store.snooze(id: snapshot.id, to: date)) != nil else { return }
         triageCount += 1
         await refresh()
     }
@@ -110,6 +137,10 @@ final class AppModel {
     /// Returns false when the write failed so the UI can hand the text back —
     /// a user's message must never be silently lost.
     func append(_ message: String, to snapshot: ReminderSnapshot) async -> Bool {
+        if isPreview {
+            previewReplace(snapshot, with: snapshot.with(note: NoteCodec.append(message, to: snapshot.note)))
+            return true
+        }
         do {
             try store.appendMessage(id: snapshot.id, message: message)
         } catch {
@@ -122,10 +153,57 @@ final class AppModel {
     func capture(title: String) async {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        if isPreview {
+            let fresh = ReminderSnapshot(
+                id: UUID().uuidString, listID: "preview", listTitle: "Inbox",
+                listColorHex: "#3B82F6", title: trimmed,
+                dueDate: Calendar.current.startOfDay(for: .now), creationDate: .now
+            )
+            previewReplace(nil, with: fresh)
+            return
+        }
         // Capture into a list the active filter can actually show.
         let target = selectedCalendars()?.first
         try? store.createReminder(title: trimmed, due: .now, in: target)
         await refresh()
+    }
+
+    // MARK: Preview support
+
+    /// Re-runs classification over the in-memory set after a local mutation.
+    private func previewReplace(_ old: ReminderSnapshot?, with new: ReminderSnapshot) {
+        var all = inbox + snoozed + settled
+        if let old { all.removeAll { $0.id == old.id } }
+        all.append(new)
+        let sections = engine.sections(from: all, today: .now)
+        inbox = sections.inbox
+        snoozed = sections.snoozed
+        settled = all.filter(\.isCompleted)
+            .sorted { ($0.completionDate ?? .distantPast) > ($1.completionDate ?? .distantPast) }
+    }
+
+    static func preview() -> AppModel {
+        let day: (Int) -> Date = { Calendar.current.date(byAdding: .day, value: $0, to: Calendar.current.startOfDay(for: .now))! }
+        func item(_ id: String, _ title: String, list: String = "Reminders", color: String = "#3B82F6",
+                  due: Int, note: String? = nil, done: Bool = false) -> ReminderSnapshot {
+            ReminderSnapshot(
+                id: id, listID: list, listTitle: list, listColorHex: color, title: title,
+                dueDate: day(due), isCompleted: done, completionDate: done ? day(0) : nil,
+                creationDate: day(-5), note: note
+            )
+        }
+        return AppModel(preview: [
+            item("1", "Reply to Alisher about admin roles", due: -2,
+                 note: NoteCodec.append("He pinged again on Slack.", to: NoteCodec.append("Waiting on the role matrix.", to: nil))),
+            item("2", "Update CV after Macy's", due: -1),
+            item("3", "Review meal location association order", list: "tripleseat", color: "#EC4899", due: 0,
+                 note: "Check the sort order regression first."),
+            item("4", "Book dentist", due: 0),
+            item("5", "Prepare tab extension for team", list: "T3", color: "#6366F1", due: 2),
+            item("6", "Renew passport", due: 6, note: "Photos are already done."),
+            item("7", "Assess Microsoft Keycloak login", due: -1, done: true),
+            item("8", "Use Tailscale alias in artifacts", due: 0, done: true),
+        ])
     }
 
     // MARK: List selection persistence

@@ -41,4 +41,25 @@ public struct ReminderSnapshot: Identifiable, Hashable, Sendable {
     }
 
     public var messages: [String] { NoteCodec.parse(note) }
+
+    /// Copy with selected fields changed. Used by in-memory preview state.
+    public func with(
+        dueDate: Date?? = nil,
+        isCompleted: Bool? = nil,
+        completionDate: Date?? = nil,
+        note: String?? = nil
+    ) -> ReminderSnapshot {
+        ReminderSnapshot(
+            id: id,
+            listID: listID,
+            listTitle: listTitle,
+            listColorHex: listColorHex,
+            title: title,
+            dueDate: dueDate ?? self.dueDate,
+            isCompleted: isCompleted ?? self.isCompleted,
+            completionDate: completionDate ?? self.completionDate,
+            creationDate: creationDate,
+            note: note ?? self.note
+        )
+    }
 }

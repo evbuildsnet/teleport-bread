@@ -109,3 +109,10 @@ struct ThreadView: View {
         }
     }
 }
+
+#Preview("Thread") {
+    NavigationStack {
+        ThreadView(reminderID: "1")
+    }
+    .environment(AppModel.preview())
+}
