@@ -84,9 +84,20 @@ struct MacRootView: View {
     /// ⌘-held badges and "type anywhere to focus the composer" (T3 behaviour):
     /// an unmodified printable key outside any text control seeds the composer.
     private func installKeyMonitors() {
-        NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown]) { event in
+        // ⌘ released while another app was frontmost never reaches this
+        // monitor; re-read the live modifier state whenever we come back.
+        for name in [NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification] {
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { ui.commandHeld = NSEvent.modifierFlags.contains(.command) }
+            }
+        }
+        NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown, .mouseMoved, .leftMouseDown]) { event in
             let isFlagsChange = event.type == .flagsChanged
             let flags = event.modifierFlags
+            if event.type == .mouseMoved || event.type == .leftMouseDown {
+                MainActor.assumeIsolated { ui.commandHeld = flags.contains(.command) }
+                return event
+            }
             let characters = event.characters
             let inTextControl = NSApp.keyWindow?.firstResponder is NSTextView
             // Keys for the capture panel (or any panel) are never ours to redirect.
