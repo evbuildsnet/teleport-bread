@@ -89,6 +89,8 @@ struct MacRootView: View {
             let flags = event.modifierFlags
             let characters = event.characters
             let inTextControl = NSApp.keyWindow?.firstResponder is NSTextView
+            // Keys for the capture panel (or any panel) are never ours to redirect.
+            if event.window is NSPanel { return event }
             let consumed = MainActor.assumeIsolated { () -> Bool in
                 ui.commandHeld = flags.contains(.command)
                 guard !isFlagsChange, model.phase == .ready, !ui.paletteOpen,

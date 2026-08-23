@@ -29,6 +29,20 @@ final class CapturePanelController {
         // Non-activating: the panel takes key without activating the app, so
         // the previous app keeps its state and a later click outside dismisses.
         panel.makeKeyAndOrderFront(nil)
+        // The app isn't activated, so SwiftUI focus doesn't engage on its
+        // own; hand first responder to the field explicitly.
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(50))
+            if let field = panel.contentView.flatMap(Self.firstTextField) {
+                panel.makeFirstResponder(field)
+            }
+        }
+    }
+
+    private static func firstTextField(in view: NSView) -> NSTextField? {
+        if let field = view as? NSTextField, field.isEditable { return field }
+        for sub in view.subviews { if let found = firstTextField(in: sub) { return found } }
+        return nil
     }
 
     func close() {

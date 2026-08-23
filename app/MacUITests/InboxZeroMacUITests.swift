@@ -4,12 +4,25 @@ import XCTest
 /// it at the end, so runs don't depend on seed data and don't accumulate.
 final class InboxZeroMacUITests: XCTestCase {
     var app: XCUIApplication!
+    /// Needs created by the running test; tearDown settles whatever a failed
+    /// test left active so no stray reminders accumulate.
+    private var created: [String] = []
 
     override func setUp() {
         continueAfterFailure = false
         app = XCUIApplication()
         app.launch()
         XCTAssertTrue(app.buttons["New need"].waitForExistence(timeout: 15), "window should reach the ready state")
+    }
+
+    override func tearDown() {
+        for title in created {
+            openViaPalette(title)
+            if app.staticTexts["This need is settled."].waitForExistence(timeout: 2) { continue }
+            if app.buttons["Wake now"].exists { app.buttons["Wake now"].click() }
+            paletteAction("settle", on: nil)
+        }
+        created = []
     }
 
     private func unique(_ prefix: String) -> String { "\(prefix) \(Int(Date().timeIntervalSince1970))" }
@@ -19,6 +32,7 @@ final class InboxZeroMacUITests: XCTestCase {
     }
 
     private func capture(_ title: String) {
+        created.append(title)
         app.typeKey("n", modifierFlags: .command)
         let composer = app.textViews["Composer"].firstMatch
         XCTAssertTrue(composer.waitForExistence(timeout: 5))
@@ -28,44 +42,56 @@ final class InboxZeroMacUITests: XCTestCase {
         XCTAssertTrue(row(title).waitForExistence(timeout: 5), "captured need should appear in the sidebar")
     }
 
-    private func settleViaPalette(_ title: String) {
-        row(title).click()
+    /// ⌘K, type, ⏎ — runs the first result.
+    private func palette(_ text: String) {
         app.typeKey("k", modifierFlags: .command)
         let search = app.textFields["Palette search"].firstMatch
         XCTAssertTrue(search.waitForExistence(timeout: 5))
-        search.typeText(">settle")
+        search.typeText(text)
         search.typeKey(.return, modifierFlags: [])
     }
+
+    /// Opens a need by searching its title — independent of shelf state.
+    private func openViaPalette(_ title: String) {
+        palette(title)
+        let opened = app.descendants(matching: .any).matching(identifier: "threadTitle")
+            .matching(NSPredicate(format: "value == %@", title)).firstMatch
+        XCTAssertTrue(opened.waitForExistence(timeout: 5), "need should open in the thread pane")
+    }
+
+    /// Runs a palette action against the selected need (or `title` first).
+    private func paletteAction(_ query: String, on title: String?) {
+        if let title { openViaPalette(title) }
+        palette(">" + query)
+    }
+
+    private func settleViaPalette(_ title: String) { paletteAction("settle", on: title) }
+
+    private func bubble(_ note: String) -> XCUIElement { app.staticTexts[note].firstMatch }
 
     func testCaptureAndSettleViaPalette() {
         let title = unique("Mac capture")
         capture(title)
         settleViaPalette(title)
-        // Settled shelf is expanded by default; the row is still there, as settled.
-        XCTAssertTrue(row(title).waitForExistence(timeout: 5))
-        row(title).click()
+        openViaPalette(title)
         XCTAssertTrue(app.staticTexts["This need is settled."].waitForExistence(timeout: 5))
     }
 
     func testSnoozeWakeThenSettle() {
         let title = unique("Mac snooze")
         capture(title)
-        row(title).rightClick()
-        app.menuItems["Snooze"].firstMatch.hover()
-        let tomorrow = app.menuItems["Tomorrow"].firstMatch
-        XCTAssertTrue(tomorrow.waitForExistence(timeout: 3))
-        tomorrow.click()
-        // Need is now in the Snoozed shelf; open it and wake from the banner.
-        let header = app.buttons["Snoozed section"].firstMatch
-        XCTAssertTrue(header.waitForExistence(timeout: 5))
-        if !row(title).exists { header.click() }
-        XCTAssertTrue(row(title).waitForExistence(timeout: 5))
-        row(title).click()
+        paletteAction("snooze until tomorrow", on: title)
+        // Need is now snoozed; open it through search and wake from the banner.
+        sleep(1)
+        openViaPalette(title)
         let wake = app.buttons["Wake now"].firstMatch
         XCTAssertTrue(wake.waitForExistence(timeout: 5))
         wake.click()
         XCTAssertFalse(app.buttons["Wake now"].waitForExistence(timeout: 3))
         settleViaPalette(title)
+        // Settling the open need advances the pane to the next inbox need;
+        // re-open the settled one to see its banner.
+        openViaPalette(title)
         XCTAssertTrue(app.staticTexts["This need is settled."].waitForExistence(timeout: 5))
     }
 
@@ -77,14 +103,13 @@ final class InboxZeroMacUITests: XCTestCase {
         composer.click()
         composer.typeText(note)
         composer.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(app.textViews.matching(NSPredicate(format: "value == %@", note)).firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(bubble(note).waitForExistence(timeout: 5))
 
         app.terminate()
         app.launch()
         XCTAssertTrue(row(title).waitForExistence(timeout: 15))
         row(title).click()
-        XCTAssertTrue(app.textViews.matching(NSPredicate(format: "value == %@", note)).firstMatch.waitForExistence(timeout: 5),
-                      "note should survive a cold relaunch")
+        XCTAssertTrue(bubble(note).waitForExistence(timeout: 5), "note should survive a cold relaunch")
         settleViaPalette(title)
     }
 }

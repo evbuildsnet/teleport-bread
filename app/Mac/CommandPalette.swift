@@ -6,9 +6,10 @@ import SwiftUI
 struct CommandPalette: View {
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
-    @State private var query = ""
-    @State private var highlighted = 0
     @FocusState private var focused: Bool
+    @State private var contentHeight: CGFloat = 0
+    private var query: String { ui.paletteQuery }
+    private var highlighted: Int { ui.paletteHighlighted }
 
     private struct Entry: Identifiable {
         let id: String
@@ -26,7 +27,7 @@ struct CommandPalette: View {
             Entry(id: "new", title: "New need", subtitle: "⌘N", symbol: "square.and.pencil") { ui.newDraft(model: model) },
         ]
         if let need = current {
-            let isSettled = need.isCompleted
+            let isSettled = model.settled.contains { $0.id == need.id }
             let isSnoozed = !isSettled && model.snoozed.contains { $0.id == need.id }
             if isSettled {
                 list.append(Entry(id: "unsettle", title: "Un-settle need", subtitle: need.title, symbol: "arrow.uturn.backward") { actions.unsettle(need) })
@@ -71,6 +72,7 @@ struct CommandPalette: View {
     private var rowCount: Int { results.actions.count + results.needs.count }
 
     var body: some View {
+        @Bindable var ui = ui
         ZStack(alignment: .top) {
             Color.black.opacity(0.25)
                 .ignoresSafeArea()
@@ -78,7 +80,7 @@ struct CommandPalette: View {
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundStyle(Theme.muted)
-                    TextField("Search needs and actions…", text: $query)
+                    TextField("Search needs and actions…", text: $ui.paletteQuery)
                         .textFieldStyle(.plain)
                         .font(.system(size: 15))
                         .focused($focused)
@@ -86,7 +88,7 @@ struct CommandPalette: View {
                         .onKeyPress(.escape) { ui.paletteOpen = false; return .handled }
                         .onKeyPress(.upArrow) { move(-1); return .handled }
                         .onKeyPress(.downArrow) { move(1); return .handled }
-                        .onChange(of: query) { _, _ in highlighted = 0 }
+                        .onChange(of: ui.paletteQuery) { _, _ in ui.paletteHighlighted = 0 }
                         .accessibilityLabel("Palette search")
                 }
                 .padding(.horizontal, 14)
@@ -99,7 +101,7 @@ struct CommandPalette: View {
                             if !actions.isEmpty {
                                 sectionLabel("Actions")
                                 ForEach(Array(actions.enumerated()), id: \.element.id) { index, entry in
-                                    row(index: index, symbol: entry.symbol, title: entry.title, subtitle: entry.subtitle) {
+                                    row(id: "action-\(entry.id)", index: index, symbol: entry.symbol, title: entry.title, subtitle: entry.subtitle) {
                                         ui.paletteOpen = false
                                         entry.run()
                                     }
@@ -108,7 +110,7 @@ struct CommandPalette: View {
                             if !needs.isEmpty {
                                 sectionLabel(query.trimmingCharacters(in: .whitespaces).isEmpty ? "Needs" : "Matching needs")
                                 ForEach(Array(needs.enumerated()), id: \.element.id) { offset, need in
-                                    row(index: actions.count + offset, symbol: "circle", title: need.title, subtitle: need.listTitle) {
+                                    row(id: "need-\(need.id)", index: actions.count + offset, symbol: "circle", title: need.title, subtitle: need.listTitle) {
                                         ui.paletteOpen = false
                                         ui.open(.need(need.id), model: model)
                                     }
@@ -123,10 +125,15 @@ struct CommandPalette: View {
                             }
                         }
                         .padding(8)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
                     }
-                    .onChange(of: highlighted) { _, index in proxy.scrollTo(index) }
+                    .frame(height: min(contentHeight, 380))
+                    .onChange(of: highlighted) { _, index in
+                        let (actions, needs) = results
+                        if index < actions.count { proxy.scrollTo("action-\(actions[index].id)") }
+                        else if needs.indices.contains(index - actions.count) { proxy.scrollTo("need-\(needs[index - actions.count].id)") }
+                    }
                 }
-                .frame(maxHeight: 380)
             }
             .frame(width: 560)
             .background(Theme.overlay, in: RoundedRectangle(cornerRadius: 14))
@@ -150,7 +157,7 @@ struct CommandPalette: View {
             .padding(.bottom, 2)
     }
 
-    private func row(index: Int, symbol: String, title: String, subtitle: String?, action: @escaping () -> Void) -> some View {
+    private func row(id: String, index: Int, symbol: String, title: String, subtitle: String?, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Image(systemName: symbol)
@@ -174,12 +181,12 @@ struct CommandPalette: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PaletteRowStyle(highlighted: highlighted == index))
-        .id(index)
+        .id(id)
     }
 
     private func move(_ offset: Int) {
         guard rowCount > 0 else { return }
-        highlighted = (highlighted + offset + rowCount) % rowCount
+        ui.paletteHighlighted = (highlighted + offset + rowCount) % rowCount
     }
 
     private func runHighlighted() {

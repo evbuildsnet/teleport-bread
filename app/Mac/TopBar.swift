@@ -53,6 +53,8 @@ struct TopBar: View {
                     .menuIndicator(.hidden)
                     .fixedSize()
                     .accessibilityLabel("Need actions")
+                    .accessibilityIdentifier("threadTitle")
+                    .accessibilityValue(snapshot.title)
                 }
             }
             Spacer()

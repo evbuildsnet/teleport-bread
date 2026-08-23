@@ -48,7 +48,8 @@ struct NeedActionMenu: View {
 
     var body: some View {
         let actions = NeedActions(model: model, ui: ui)
-        let isSettled = snapshot.isCompleted
+        // Live placement, not the snapshot's flag: a row can outlive a refresh.
+        let isSettled = model.settled.contains { $0.id == snapshot.id }
         let isSnoozed = !isSettled && model.snoozed.contains { $0.id == snapshot.id }
 
         if isSettled {

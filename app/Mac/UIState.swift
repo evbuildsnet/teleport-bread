@@ -37,8 +37,15 @@ final class UIState {
     }
     var settledShown = UIState.settledInitialCount
     var paletteOpen = false {
-        didSet { if paletteOpen { NSApp.keyWindow?.makeFirstResponder(nil) } }
+        didSet {
+            guard paletteOpen else { return }
+            paletteQuery = ""
+            paletteHighlighted = 0
+            NSApp.keyWindow?.makeFirstResponder(nil)
+        }
     }
+    var paletteQuery = ""
+    var paletteHighlighted = 0
     /// ⌘ held: rows show their jump numbers.
     var commandHeld = false
     /// Exactly one sidebar row can be hovered; cleared whenever the list

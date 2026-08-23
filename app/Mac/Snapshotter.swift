@@ -42,6 +42,11 @@ enum Snapshotter {
         await shoot("02-shelves-open")
         ui.paletteOpen = true
         await shoot("03-palette")
+        ui.paletteQuery = "passport"
+        await shoot("03b-palette-query")
+        ui.paletteQuery = ""
+        ui.paletteHighlighted = 1
+        await shoot("03c-palette-highlight")
         ui.paletteOpen = false
         ui.newDraft(model: model)
         await shoot("04-draft-hero")
