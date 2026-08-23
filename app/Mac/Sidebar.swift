@@ -41,7 +41,8 @@ struct Sidebar: View {
                         }
                     }
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
+                    .padding(.top, 18) // room for a tooltip above the first row
+                    .padding(.bottom, 6)
                 }
                 .onChange(of: ui.selection) { _, selection in
                     guard let id = selection?.needID else { return }
@@ -71,7 +72,7 @@ struct Sidebar: View {
                     Image(systemName: "sidebar.left")
                 }
                 .buttonStyle(SidebarIconButtonStyle())
-                .tooltip("Hide sidebar ⌘B")
+                .tooltip("Hide sidebar ⌘B", edge: .bottom)
                 Text("InboxZero")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.sidebarText)
@@ -105,7 +106,7 @@ struct Sidebar: View {
                     Image(systemName: "square.and.pencil")
                 }
                 .buttonStyle(SidebarIconButtonStyle())
-                .tooltip("New need ⌘N")
+                .tooltip("New need ⌘N", edge: .bottom)
                 .accessibilityLabel("New need")
             }
             .padding(.horizontal, 10)

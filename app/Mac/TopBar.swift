@@ -21,7 +21,7 @@ struct TopBar: View {
                     Image(systemName: "sidebar.left")
                 }
                 .buttonStyle(SidebarIconButtonStyle())
-                .tooltip("Show sidebar ⌘B")
+                .tooltip("Show sidebar ⌘B", edge: .bottom)
             }
             if let snapshot {
                 if renaming {
