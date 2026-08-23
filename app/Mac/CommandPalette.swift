@@ -135,7 +135,7 @@ struct CommandPalette: View {
             .padding(.top, 90)
         }
         .task {
-            try? await Task.sleep(for: .milliseconds(60))
+            try? await Task.sleep(for: .milliseconds(120))
             focused = true
         }
         .onExitCommand { ui.paletteOpen = false }

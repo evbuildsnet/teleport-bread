@@ -83,16 +83,19 @@ final class HotKeyCenter {
 
     private func installHandler() {
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
+        let status = InstallEventHandler(GetApplicationEventTarget(), { _, _, _ in
+            NSLog("InboxZero hotkey pressed")
             Task { @MainActor in HotKeyCenter.shared.onPress?() }
             return noErr
         }, 1, &spec, nil, &handlerRef)
+        NSLog("InboxZero hotkey handler installed: %d", status)
     }
 
     private func register() {
         if let hotKeyRef { UnregisterEventHotKey(hotKeyRef); self.hotKeyRef = nil }
         guard let combo else { return }
         let id = EventHotKeyID(signature: OSType(0x495A_4B59), id: 1) // "IZKY"
-        RegisterEventHotKey(combo.keyCode, combo.carbonModifiers, id, GetApplicationEventTarget(), 0, &hotKeyRef)
+        let status = RegisterEventHotKey(combo.keyCode, combo.carbonModifiers, id, GetApplicationEventTarget(), 0, &hotKeyRef)
+        NSLog("InboxZero hotkey register %@ → %d", combo.display, status)
     }
 }

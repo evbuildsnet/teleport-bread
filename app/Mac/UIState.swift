@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import InboxCore
 import Observation
@@ -35,7 +36,9 @@ final class UIState {
         didSet { UserDefaults.standard.set(settledExpanded, forKey: "settledExpanded") }
     }
     var settledShown = UIState.settledInitialCount
-    var paletteOpen = false
+    var paletteOpen = false {
+        didSet { if paletteOpen { NSApp.keyWindow?.makeFirstResponder(nil) } }
+    }
     /// ⌘ held: rows show their jump numbers.
     var commandHeld = false
     /// Exactly one sidebar row can be hovered; cleared whenever the list
@@ -120,6 +123,7 @@ final class UIState {
     }
 
     func newDraft(model: AppModel) {
+        NSApp.keyWindow?.makeFirstResponder(nil)
         if let draft = activeDraft, case .draft(draft.id) = selection, draft.title.isEmpty {
             return // already on an empty hero
         }

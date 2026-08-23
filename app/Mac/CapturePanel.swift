@@ -26,8 +26,9 @@ final class CapturePanelController {
         if let frame = screen?.visibleFrame {
             panel.setFrameOrigin(NSPoint(x: frame.midX - size.width / 2, y: frame.minY + frame.height * 0.66))
         }
+        // Non-activating: the panel takes key without activating the app, so
+        // the previous app keeps its state and a later click outside dismisses.
         panel.makeKeyAndOrderFront(nil)
-        NSApp.activate()
     }
 
     func close() {

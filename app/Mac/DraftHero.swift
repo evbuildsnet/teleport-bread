@@ -40,7 +40,7 @@ struct DraftHero: View {
         .task {
             // Focus after the first layout pass; an immediate request loses
             // to whatever field (e.g. sidebar search) held focus before.
-            try? await Task.sleep(for: .milliseconds(60))
+            try? await Task.sleep(for: .milliseconds(120))
             focused = true
         }
         .onChange(of: title) { _, value in
