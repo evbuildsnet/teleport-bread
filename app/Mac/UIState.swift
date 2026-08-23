@@ -38,9 +38,16 @@ final class UIState {
     var paletteOpen = false
     /// ⌘ held: rows show their jump numbers.
     var commandHeld = false
+    /// Exactly one sidebar row can be hovered; cleared whenever the list
+    /// shifts under a stationary cursor (onHover doesn't fire then).
+    var hoveredID: String?
     /// Bumped to ask the thread composer to take focus (printable-key typing).
     var composerFocusRequest = 0
     var composerSeed = ""
+
+    func setHover(_ id: String, _ inside: Bool) {
+        if inside { hoveredID = id } else if hoveredID == id { hoveredID = nil }
+    }
 
     static let settledInitialCount = 10
     static let settledPageCount = 25
@@ -99,6 +106,7 @@ final class UIState {
     // MARK: Selection changes keep drafts honest
 
     func open(_ target: Selection?, model: AppModel) {
+        hoveredID = nil
         if target != selection, let draft = activeDraft, case .draft(draft.id) = selection {
             // Leaving the hero: keep non-empty work as a sidebar draft.
             model.stash(draft)

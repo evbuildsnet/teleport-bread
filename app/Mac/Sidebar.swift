@@ -45,6 +45,10 @@ struct Sidebar: View {
                     guard let id = selection?.needID else { return }
                     proxy.scrollTo(id, anchor: nil)
                 }
+                .onChange(of: model.inbox.count + model.snoozed.count + model.settled.count) { _, _ in
+                    ui.hoveredID = nil
+                }
+                .onChange(of: ui.snoozedExpanded || ui.settledExpanded) { _, _ in ui.hoveredID = nil }
             }
         }
         .overlay(alignment: .trailing) {
@@ -215,9 +219,9 @@ struct NeedCard: View {
     @Environment(UIState.self) private var ui
     let snapshot: ReminderSnapshot
     let number: Int?
-    @State private var hovering = false
 
     private var isSelected: Bool { ui.selection == .need(snapshot.id) }
+    private var hovering: Bool { ui.hoveredID == snapshot.id }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -246,7 +250,7 @@ struct NeedCard: View {
         .background(rowBackground(isSelected: isSelected, hovering: hovering), in: RoundedRectangle(cornerRadius: Theme.radius))
         .contentShape(Rectangle())
         .onTapGesture { ui.open(.need(snapshot.id), model: model) }
-        .onHover { hovering = $0 }
+        .onHover { ui.setHover(snapshot.id, $0) }
         .contextMenu { NeedActionMenu(snapshot: snapshot) }
         .overlay(alignment: .bottomTrailing) { JumpBadge(number: number) }
         .accessibilityElement(children: .combine)
@@ -277,9 +281,9 @@ struct NeedRow: View {
     let snapshot: ReminderSnapshot
     let placement: Placement
     let number: Int?
-    @State private var hovering = false
 
     private var isSelected: Bool { ui.selection == .need(snapshot.id) }
+    private var hovering: Bool { ui.hoveredID == snapshot.id }
 
     private var timeLabel: String {
         switch placement {
@@ -312,7 +316,7 @@ struct NeedRow: View {
         .background(rowBackground(isSelected: isSelected, hovering: hovering), in: RoundedRectangle(cornerRadius: Theme.controlRadius))
         .contentShape(Rectangle())
         .onTapGesture { ui.open(.need(snapshot.id), model: model) }
-        .onHover { hovering = $0 }
+        .onHover { ui.setHover(snapshot.id, $0) }
         .contextMenu { NeedActionMenu(snapshot: snapshot) }
         .overlay(alignment: .bottomTrailing) { JumpBadge(number: number) }
         .accessibilityElement(children: .combine)
@@ -325,9 +329,9 @@ struct DraftRow: View {
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
     let draft: NeedDraft
-    @State private var hovering = false
 
     private var isSelected: Bool { ui.selection == .draft(draft.id) }
+    private var hovering: Bool { ui.hoveredID == draft.id.uuidString }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -357,7 +361,7 @@ struct DraftRow: View {
         .background(rowBackground(isSelected: isSelected, hovering: hovering), in: RoundedRectangle(cornerRadius: Theme.controlRadius))
         .contentShape(Rectangle())
         .onTapGesture { ui.open(.draft(draft.id), model: model) }
-        .onHover { hovering = $0 }
+        .onHover { ui.setHover(draft.id.uuidString, $0) }
     }
 }
 

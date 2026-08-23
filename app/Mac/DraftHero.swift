@@ -36,8 +36,11 @@ struct DraftHero: View {
             Spacer()
             Spacer()
         }
-        .onAppear {
-            title = ui.activeDraft?.title ?? ""
+        .onAppear { title = ui.activeDraft?.title ?? "" }
+        .task {
+            // Focus after the first layout pass; an immediate request loses
+            // to whatever field (e.g. sidebar search) held focus before.
+            try? await Task.sleep(for: .milliseconds(60))
             focused = true
         }
         .onChange(of: title) { _, value in

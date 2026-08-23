@@ -134,7 +134,10 @@ struct CommandPalette: View {
             .shadow(color: .black.opacity(0.35), radius: 30, y: 10)
             .padding(.top, 90)
         }
-        .onAppear { focused = true }
+        .task {
+            try? await Task.sleep(for: .milliseconds(60))
+            focused = true
+        }
         .onExitCommand { ui.paletteOpen = false }
     }
 

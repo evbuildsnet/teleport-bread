@@ -15,11 +15,14 @@ struct InboxZeroMacApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1100, height: 780)
+        Settings { SettingsView() }
         .commands {
             // T3 Code's shortcut set — nothing invented.
             CommandGroup(replacing: .newItem) {
                 Button("New Need") { ui.newDraft(model: model) }
                     .keyboardShortcut("n", modifiers: .command)
+                    .disabled(model.phase != .ready)
+                Button("Quick Capture") { CapturePanelController.shared.toggle(model: model) }
                     .disabled(model.phase != .ready)
             }
             CommandMenu("Go") {
@@ -74,6 +77,7 @@ struct MacRootView: View {
             if phase == .active { Task { await model.refresh() } }
         }
         .task { installKeyMonitors() }
+        .task { HotKeyCenter.shared.onPress = { CapturePanelController.shared.toggle(model: model) } }
         .task { await Snapshotter.run(model: model, ui: ui) }
     }
 

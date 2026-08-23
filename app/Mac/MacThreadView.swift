@@ -30,6 +30,10 @@ struct MacThreadView: View {
             ui.composerSeed = ""
             composerFocused = true
         }
+        .task {
+            try? await Task.sleep(for: .milliseconds(60))
+            composerFocused = true
+        }
     }
 
     // MARK: Log
