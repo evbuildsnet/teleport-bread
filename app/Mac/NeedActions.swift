@@ -110,7 +110,10 @@ struct HoverActions: View {
     }
 
     private var snoozeButton: some View {
-        iconButton("clock", help: "Snooze") { snoozeOpen = true }
+        Button { snoozeOpen = true } label: { Image(systemName: "clock") }
+            .buttonStyle(SidebarIconButtonStyle())
+            .accessibilityLabel("Snooze need")
+            .tooltip("Snooze", suppressed: snoozeOpen)
             .popover(isPresented: $snoozeOpen, arrowEdge: .trailing) {
                 SnoozePopover(snapshot: snapshot)
             }
@@ -127,7 +130,7 @@ struct HoverActions: View {
             Image(systemName: symbol)
         }
         .buttonStyle(SidebarIconButtonStyle())
-        .help(help)
+        .tooltip(help)
         .accessibilityLabel("\(help) need")
     }
 }

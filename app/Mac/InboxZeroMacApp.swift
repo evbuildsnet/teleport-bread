@@ -77,6 +77,12 @@ struct MacRootView: View {
             if phase == .active { Task { await model.refresh() } }
         }
         .task { installKeyMonitors() }
+        // The one reliable source for "is ⌘ down": SwiftUI's modifier-key
+        // tracking. Event monitors miss flagsChanged in several focus states.
+        .onModifierKeysChanged(mask: .command, initial: true) { _, new in
+            let command = new.contains(.command)
+            if ui.commandHeld != command { ui.commandHeld = command }
+        }
         .task { HotKeyCenter.shared.onPress = { CapturePanelController.shared.toggle(model: model) } }
         .task { await Snapshotter.run(model: model, ui: ui) }
     }

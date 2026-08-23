@@ -219,7 +219,7 @@ struct NoteBubble: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(label)
+        .tooltip(label)
         .accessibilityLabel(label)
     }
 }

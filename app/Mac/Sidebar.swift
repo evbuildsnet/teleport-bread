@@ -71,7 +71,7 @@ struct Sidebar: View {
                     Image(systemName: "sidebar.left")
                 }
                 .buttonStyle(SidebarIconButtonStyle())
-                .help("Hide sidebar (⌘B)")
+                .tooltip("Hide sidebar ⌘B")
                 Text("InboxZero")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.sidebarText)
@@ -105,7 +105,7 @@ struct Sidebar: View {
                     Image(systemName: "square.and.pencil")
                 }
                 .buttonStyle(SidebarIconButtonStyle())
-                .help("New need (⌘N)")
+                .tooltip("New need ⌘N")
                 .accessibilityLabel("New need")
             }
             .padding(.horizontal, 10)
@@ -235,22 +235,26 @@ struct NeedCard: View {
     private var hovering: Bool { ui.hoveredID == snapshot.id }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 8) {
-            Text(snapshot.title)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Theme.sidebarText)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if hovering {
-                HoverActions(snapshot: snapshot, placement: .inbox)
+        Text(snapshot.title)
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(Theme.sidebarText)
+            .lineLimit(2)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            // Fixed height fitting the 2-line title cap: hover must never
+            // change a row's height (the list would jump under the cursor).
+            .frame(height: 54)
+            .background(rowBackground(isSelected: isSelected, hovering: hovering), in: RoundedRectangle(cornerRadius: Theme.radius))
+            // Actions float over the title instead of squeezing it.
+            .overlay(alignment: .trailing) {
+                if hovering {
+                    HoverActions(snapshot: snapshot, placement: .inbox)
+                        .padding(.trailing, 6)
+                        .background(actionsBackdrop(rowBackground(isSelected: isSelected, hovering: hovering)))
+                }
             }
-        }
-        .padding(.horizontal, 10)
-        // Fixed height fitting the 2-line title cap: hover must never
-        // change a row's height (the list would jump under the cursor).
-        .frame(height: 54)
-        .background(rowBackground(isSelected: isSelected, hovering: hovering), in: RoundedRectangle(cornerRadius: Theme.radius))
+            .zIndex(hovering ? 1 : 0)
         .contentShape(Rectangle())
         .onTapGesture { ui.open(.need(snapshot.id), model: model) }
         .onHover { ui.setHover(snapshot.id, $0) }
@@ -275,19 +279,22 @@ struct NeedRow: View {
     private var hovering: Bool { ui.hoveredID == snapshot.id }
 
     var body: some View {
-        HStack(spacing: 8) {
-            Text(snapshot.title)
-                .font(.system(size: 13))
-                .foregroundStyle(Theme.sidebarMuted)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if hovering {
-                HoverActions(snapshot: snapshot, placement: placement == .snoozed ? .snoozed : .settled)
+        Text(snapshot.title)
+            .font(.system(size: 13))
+            .foregroundStyle(Theme.sidebarMuted)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 10)
+            .frame(height: Theme.rowHeight)
+            .background(rowBackground(isSelected: isSelected, hovering: hovering), in: RoundedRectangle(cornerRadius: Theme.controlRadius))
+            .overlay(alignment: .trailing) {
+                if hovering {
+                    HoverActions(snapshot: snapshot, placement: placement == .snoozed ? .snoozed : .settled)
+                        .padding(.trailing, 6)
+                        .background(actionsBackdrop(rowBackground(isSelected: isSelected, hovering: hovering)))
+                }
             }
-        }
-        .padding(.horizontal, 10)
-        .frame(height: Theme.rowHeight)
-        .background(rowBackground(isSelected: isSelected, hovering: hovering), in: RoundedRectangle(cornerRadius: Theme.controlRadius))
+            .zIndex(hovering ? 1 : 0)
         .contentShape(Rectangle())
         .onTapGesture { ui.open(.need(snapshot.id), model: model) }
         .onHover { ui.setHover(snapshot.id, $0) }
@@ -326,7 +333,7 @@ struct DraftRow: View {
                     Image(systemName: "trash")
                 }
                 .buttonStyle(SidebarIconButtonStyle())
-                .help("Discard draft")
+                .tooltip("Discard draft")
             }
         }
         .padding(.horizontal, 10)
@@ -340,6 +347,17 @@ struct DraftRow: View {
 
 private func rowBackground(isSelected: Bool, hovering: Bool) -> Color {
     isSelected ? Theme.sidebarSelected : hovering ? Theme.sidebarHover : .clear
+}
+
+/// Solid behind the buttons, fading out to the left so covered text ends
+/// softly rather than with a hard edge.
+private func actionsBackdrop(_ color: Color) -> some View {
+    HStack(spacing: 0) {
+        LinearGradient(colors: [color.opacity(0), color], startPoint: .leading, endPoint: .trailing)
+            .frame(width: 28)
+        color
+    }
+    .padding(.leading, -28)
 }
 
 struct JumpBadge: View {
