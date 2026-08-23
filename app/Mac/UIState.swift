@@ -29,9 +29,9 @@ final class UIState {
     var sidebarWidth: CGFloat {
         didSet { UserDefaults.standard.set(sidebarWidth, forKey: "sidebarWidth") }
     }
-    var snoozedExpanded: Bool {
-        didSet { UserDefaults.standard.set(snoozedExpanded, forKey: "snoozedExpanded") }
-    }
+    /// Deliberately not persisted: a triage surface starts each session
+    /// with the snoozed shelf out of sight (matches mobile).
+    var snoozedExpanded = false
     var settledExpanded: Bool {
         didSet { UserDefaults.standard.set(settledExpanded, forKey: "settledExpanded") }
     }
@@ -48,6 +48,8 @@ final class UIState {
     var paletteHighlighted = 0
     /// ⌘ held: rows show their jump numbers.
     var commandHeld = false
+    /// Event monitors are process-wide; never install twice.
+    var monitorsInstalled = false
     /// Exactly one sidebar row can be hovered; cleared whenever the list
     /// shifts under a stationary cursor (onHover doesn't fire then).
     var hoveredID: String?
@@ -70,7 +72,6 @@ final class UIState {
         let defaults = UserDefaults.standard
         let width = defaults.double(forKey: "sidebarWidth")
         sidebarWidth = width >= Theme.sidebarMinWidth ? width : Theme.sidebarDefaultWidth
-        snoozedExpanded = defaults.object(forKey: "snoozedExpanded") as? Bool ?? false
         settledExpanded = defaults.object(forKey: "settledExpanded") as? Bool ?? true
     }
 

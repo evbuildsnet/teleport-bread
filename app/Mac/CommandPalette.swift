@@ -1,75 +1,24 @@
 import InboxCore
 import SwiftUI
 
-/// ⌘K: search needs by title/notes and run actions. `>` prefix = actions
-/// only (T3 convention). ↑↓ move, ⏎ runs, Esc closes.
+/// ⌘K: search, nothing else. Empty query is just the field; typing lists
+/// matching needs (title or notes). ↑↓ move, ⏎ opens, Esc closes.
 struct CommandPalette: View {
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
     @FocusState private var focused: Bool
-    @State private var contentHeight: CGFloat = 0
     private var query: String { ui.paletteQuery }
     private var highlighted: Int { ui.paletteHighlighted }
 
-    private struct Entry: Identifiable {
-        let id: String
-        let title: String
-        let subtitle: String?
-        let symbol: String
-        let run: @MainActor () -> Void
-    }
-
-    private var current: ReminderSnapshot? { ui.selection?.needID.flatMap { model.snapshot(id: $0) } }
-
-    private var actions: [Entry] {
-        let actions = NeedActions(model: model, ui: ui)
-        var list: [Entry] = [
-            Entry(id: "new", title: "New need", subtitle: "⌘N", symbol: "square.and.pencil") { ui.newDraft(model: model) },
-        ]
-        if let need = current {
-            let isSettled = model.settled.contains { $0.id == need.id }
-            let isSnoozed = !isSettled && model.snoozed.contains { $0.id == need.id }
-            if isSettled {
-                list.append(Entry(id: "unsettle", title: "Un-settle need", subtitle: need.title, symbol: "arrow.uturn.backward") { actions.unsettle(need) })
-            } else if isSnoozed {
-                list.append(Entry(id: "wake", title: "Wake need", subtitle: need.title, symbol: "sun.max") { actions.wake(need) })
-            } else {
-                list.append(Entry(id: "settle", title: "Settle need", subtitle: need.title, symbol: "checkmark") { actions.settle(need) })
-            }
-            for preset in SnoozePreset.allCases {
-                list.append(Entry(id: "snooze-\(preset.rawValue)", title: "Snooze until \(preset.label.lowercased())", subtitle: need.title, symbol: "clock") { actions.snooze(need, preset) })
-            }
-            list.append(Entry(id: "snooze-pick", title: "Snooze until a date…", subtitle: need.title, symbol: "calendar") {
-                SnoozeDatePicker.present(for: need, model: model, ui: ui)
-            })
-        }
-        list.append(Entry(id: "sidebar", title: ui.sidebarVisible ? "Hide sidebar" : "Show sidebar", subtitle: "⌘B", symbol: "sidebar.left") {
-            ui.sidebarVisible.toggle()
-        })
-        list.append(Entry(id: "all-lists", title: "Show all lists", subtitle: nil, symbol: "tray.2") {
-            model.selectedListIDs = nil
-            Task { await model.refresh() }
-        })
-        return list
-    }
-
-    private var results: (actions: [Entry], needs: [ReminderSnapshot]) {
+    private var results: [ReminderSnapshot] {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
-        if trimmed.hasPrefix(">") {
-            let q = trimmed.dropFirst().trimmingCharacters(in: .whitespaces)
-            return (actions.filter { q.isEmpty || $0.title.localizedCaseInsensitiveContains(q) }, [])
-        }
+        guard !trimmed.isEmpty else { return [] }
         let all = model.inbox + model.snoozed + model.settled
-        if trimmed.isEmpty {
-            return (actions, Array(all.prefix(12)))
-        }
-        let needs = all.filter {
-            $0.title.localizedCaseInsensitiveContains(trimmed) || ($0.note?.localizedCaseInsensitiveContains(trimmed) ?? false)
-        }
-        return (actions.filter { $0.title.localizedCaseInsensitiveContains(trimmed) }, needs)
+        return Array(all.filter {
+            $0.title.localizedCaseInsensitiveContains(trimmed)
+                || ($0.note?.localizedCaseInsensitiveContains(trimmed) ?? false)
+        }.prefix(50))
     }
-
-    private var rowCount: Int { results.actions.count + results.needs.count }
 
     var body: some View {
         @Bindable var ui = ui
@@ -80,11 +29,11 @@ struct CommandPalette: View {
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundStyle(Theme.muted)
-                    TextField("Search needs and actions…", text: $ui.paletteQuery)
+                    TextField("Search needs…", text: $ui.paletteQuery)
                         .textFieldStyle(.plain)
                         .font(.system(size: 15))
                         .focused($focused)
-                        .onSubmit(runHighlighted)
+                        .onSubmit(openHighlighted)
                         .onKeyPress(.escape) { ui.paletteOpen = false; return .handled }
                         .onKeyPress(.upArrow) { move(-1); return .handled }
                         .onKeyPress(.downArrow) { move(1); return .handled }
@@ -93,46 +42,30 @@ struct CommandPalette: View {
                 }
                 .padding(.horizontal, 14)
                 .frame(height: 48)
-                Rectangle().fill(Theme.border).frame(height: 1)
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 2) {
-                            let (actions, needs) = results
-                            if !actions.isEmpty {
-                                sectionLabel("Actions")
-                                ForEach(Array(actions.enumerated()), id: \.element.id) { index, entry in
-                                    row(id: "action-\(entry.id)", index: index, symbol: entry.symbol, title: entry.title, subtitle: entry.subtitle) {
-                                        ui.paletteOpen = false
-                                        entry.run()
-                                    }
+                let needs = results
+                if !needs.isEmpty {
+                    Rectangle().fill(Theme.border).frame(height: 1)
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 2) {
+                                ForEach(Array(needs.enumerated()), id: \.element.id) { index, need in
+                                    row(need, index: index)
                                 }
                             }
-                            if !needs.isEmpty {
-                                sectionLabel(query.trimmingCharacters(in: .whitespaces).isEmpty ? "Needs" : "Matching needs")
-                                ForEach(Array(needs.enumerated()), id: \.element.id) { offset, need in
-                                    row(id: "need-\(need.id)", index: actions.count + offset, symbol: "circle", title: need.title, subtitle: need.listTitle) {
-                                        ui.paletteOpen = false
-                                        ui.open(.need(need.id), model: model)
-                                    }
-                                }
-                            }
-                            if rowCount == 0 {
-                                Text("No matching needs or actions.")
-                                    .font(.system(size: 13))
-                                    .foregroundStyle(Theme.muted)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 20)
-                            }
+                            .padding(8)
                         }
-                        .padding(8)
-                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+                        .frame(height: min(CGFloat(needs.count) * 34 + 16, 380))
+                        .onChange(of: highlighted) { _, index in
+                            if needs.indices.contains(index) { proxy.scrollTo(needs[index].id) }
+                        }
                     }
-                    .frame(height: min(contentHeight, 380))
-                    .onChange(of: highlighted) { _, index in
-                        let (actions, needs) = results
-                        if index < actions.count { proxy.scrollTo("action-\(actions[index].id)") }
-                        else if needs.indices.contains(index - actions.count) { proxy.scrollTo("need-\(needs[index - actions.count].id)") }
-                    }
+                } else if !query.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Rectangle().fill(Theme.border).frame(height: 1)
+                    Text("No matching needs.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Theme.muted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 18)
                 }
             }
             .frame(width: 560)
@@ -148,55 +81,35 @@ struct CommandPalette: View {
         .onExitCommand { ui.paletteOpen = false }
     }
 
-    private func sectionLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(Theme.muted)
-            .padding(.horizontal, 10)
-            .padding(.top, 6)
-            .padding(.bottom, 2)
-    }
-
-    private func row(id: String, index: Int, symbol: String, title: String, subtitle: String?, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    private func row(_ need: ReminderSnapshot, index: Int) -> some View {
+        Button {
+            ui.paletteOpen = false
+            ui.open(.need(need.id), model: model)
+        } label: {
             HStack(spacing: 10) {
-                Image(systemName: symbol)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.muted)
-                    .frame(width: 16)
-                Text(title)
+                Text(need.title)
                     .font(.system(size: 13))
                     .lineLimit(1)
                 Spacer()
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.muted)
-                        .lineLimit(1)
-                        .frame(maxWidth: 220, alignment: .trailing)
-                }
             }
             .padding(.horizontal, 10)
             .frame(height: 32)
             .contentShape(Rectangle())
         }
         .buttonStyle(PaletteRowStyle(highlighted: highlighted == index))
-        .id(id)
+        .id(need.id)
     }
 
     private func move(_ offset: Int) {
-        guard rowCount > 0 else { return }
-        ui.paletteHighlighted = (highlighted + offset + rowCount) % rowCount
+        let count = results.count
+        guard count > 0 else { return }
+        ui.paletteHighlighted = (highlighted + offset + count) % count
     }
 
-    private func runHighlighted() {
-        let (actions, needs) = results
-        if highlighted < actions.count {
-            ui.paletteOpen = false
-            actions[highlighted].run()
-        } else if needs.indices.contains(highlighted - actions.count) {
-            ui.paletteOpen = false
-            ui.open(.need(needs[highlighted - actions.count].id), model: model)
-        }
+    private func openHighlighted() {
+        let needs = results
+        guard needs.indices.contains(highlighted) else { return }
+        ui.paletteOpen = false
+        ui.open(.need(needs[highlighted].id), model: model)
     }
 }

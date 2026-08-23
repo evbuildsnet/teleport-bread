@@ -41,7 +41,7 @@ struct MacThreadView: View {
     private var log: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 14) {
                     let messages = live.messages
                     if messages.isEmpty {
                         Text("Leave a thought for your future self.")
@@ -192,6 +192,8 @@ struct NoteBubble: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .background(highlighted ? Theme.accent.opacity(0.18) : Theme.bubble, in: RoundedRectangle(cornerRadius: 14))
+                .frame(maxWidth: 460, alignment: .leading)
+            // Space is always reserved so hovering never shifts the log.
             HStack(spacing: 2) {
                 action("pencil", "Edit note", onEdit)
                 action("doc.on.doc", "Copy note") {
@@ -200,9 +202,11 @@ struct NoteBubble: View {
                 }
                 action("trash", "Delete note", onDelete)
             }
-            .opacity(hovering ? 1 : 0.45)
+            .opacity(hovering ? 1 : 0)
         }
+        .frame(maxWidth: 460, alignment: .trailing)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
         .onHover { hovering = $0 }
     }
 

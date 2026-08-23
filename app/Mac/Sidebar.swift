@@ -27,7 +27,9 @@ struct Sidebar: View {
             header
             ScrollViewReader { proxy in
                 ScrollView {
-                    LazyVStack(spacing: 0) {
+                    // Plain VStack on purpose: tens of rows at most, and lazy
+                    // placement loops forever on variable-height rows (100% CPU).
+                    VStack(spacing: 0) {
                         ForEach(drafts) { DraftRow(draft: $0) }
                         if !drafts.isEmpty { divider }
                         inboxRows
@@ -245,8 +247,9 @@ struct NeedCard: View {
             }
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 10)
-        .frame(minHeight: 44)
+        // Fixed height fitting the 2-line title cap: hover must never
+        // change a row's height (the list would jump under the cursor).
+        .frame(height: 54)
         .background(rowBackground(isSelected: isSelected, hovering: hovering), in: RoundedRectangle(cornerRadius: Theme.radius))
         .contentShape(Rectangle())
         .onTapGesture { ui.open(.need(snapshot.id), model: model) }

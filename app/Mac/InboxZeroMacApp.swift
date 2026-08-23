@@ -84,26 +84,29 @@ struct MacRootView: View {
     /// ⌘-held badges and "type anywhere to focus the composer" (T3 behaviour):
     /// an unmodified printable key outside any text control seeds the composer.
     private func installKeyMonitors() {
+        guard !ui.monitorsInstalled else { return }
+        ui.monitorsInstalled = true
         // ⌘ released while another app was frontmost never reaches this
         // monitor; re-read the live modifier state whenever we come back.
         for name in [NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification] {
             NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { _ in
-                MainActor.assumeIsolated { ui.commandHeld = NSEvent.modifierFlags.contains(.command) }
+                MainActor.assumeIsolated {
+                    let command = NSEvent.modifierFlags.contains(.command)
+                    if ui.commandHeld != command { ui.commandHeld = command }
+                }
             }
         }
-        NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown, .mouseMoved, .leftMouseDown]) { event in
+        NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown]) { event in
             let isFlagsChange = event.type == .flagsChanged
             let flags = event.modifierFlags
-            if event.type == .mouseMoved || event.type == .leftMouseDown {
-                MainActor.assumeIsolated { ui.commandHeld = flags.contains(.command) }
-                return event
-            }
             let characters = event.characters
             let inTextControl = NSApp.keyWindow?.firstResponder is NSTextView
             // Keys for the capture panel (or any panel) are never ours to redirect.
             if event.window is NSPanel { return event }
             let consumed = MainActor.assumeIsolated { () -> Bool in
-                ui.commandHeld = flags.contains(.command)
+                let command = flags.contains(.command)
+                // Write only on change: every write re-renders observers.
+                if ui.commandHeld != command { ui.commandHeld = command }
                 guard !isFlagsChange, model.phase == .ready, !ui.paletteOpen,
                       flags.intersection([.command, .control, .option]).isEmpty,
                       let characters, characters.count == 1,
