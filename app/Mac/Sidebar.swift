@@ -31,11 +31,11 @@ struct Sidebar: View {
                         ForEach(drafts) { DraftRow(draft: $0) }
                         if !drafts.isEmpty { divider }
                         inboxRows
-                        shelf("Snoozed", items: snoozed, isExpanded: $ui.snoozedExpanded) { item in
-                            NeedRow(snapshot: item, placement: .snoozed, number: number(of: item))
+                        shelf("Snoozed", items: snoozed, isExpanded: $ui.snoozedExpanded, tint: Theme.accent) { item in
+                            NeedRow(snapshot: item, placement: .snoozed).id("snoozed-\(item.id)")
                         }
-                        shelf("Settled", items: settled, isExpanded: $ui.settledExpanded) { item in
-                            NeedRow(snapshot: item, placement: .settled, number: number(of: item))
+                        shelf("Settled", items: settled, isExpanded: $ui.settledExpanded, tint: Theme.sidebarMuted) { item in
+                            NeedRow(snapshot: item, placement: .settled).id("settled-\(item.id)")
                         }
                     }
                     .padding(.horizontal, 8)
@@ -43,7 +43,7 @@ struct Sidebar: View {
                 }
                 .onChange(of: ui.selection) { _, selection in
                     guard let id = selection?.needID else { return }
-                    proxy.scrollTo(id, anchor: nil)
+                    proxy.scrollTo(rowID(id), anchor: nil)
                 }
                 .onChange(of: model.inbox.count + model.snoozed.count + model.settled.count) { _, _ in
                     ui.hoveredID = nil
@@ -132,7 +132,7 @@ struct Sidebar: View {
         } else {
             ForEach(inbox) { item in
                 NeedCard(snapshot: item, number: number(of: item))
-                    .id(item.id)
+                    .id("inbox-\(item.id)")
             }
         }
     }
@@ -152,6 +152,7 @@ struct Sidebar: View {
         _ title: String,
         items: [ReminderSnapshot],
         isExpanded: Binding<Bool>,
+        tint: Color,
         @ViewBuilder row: @escaping (ReminderSnapshot) -> Content
     ) -> some View {
         if !items.isEmpty {
@@ -167,7 +168,7 @@ struct Sidebar: View {
                         .font(.system(size: 9, weight: .semibold))
                         .rotationEffect(.degrees(open ? 0 : -90))
                 }
-                .foregroundStyle(Theme.sidebarMuted)
+                .foregroundStyle(tint)
                 .padding(.horizontal, 10)
                 .frame(height: 30)
                 .contentShape(Rectangle())
@@ -178,7 +179,7 @@ struct Sidebar: View {
 
             let visible = title == "Settled" ? Array(items.prefix(ui.settledShown)) : items
             if open {
-                ForEach(visible) { item in row(item).id(item.id) }
+                ForEach(visible) { item in row(item) }
                 if title == "Settled", items.count > visible.count {
                     Button {
                         ui.settledShown += UIState.settledPageCount
@@ -197,23 +198,31 @@ struct Sidebar: View {
                     .buttonStyle(.plain)
                 }
             } else if let selectedID, let kept = items.first(where: { $0.id == selectedID }) {
-                row(kept).id(kept.id)
+                row(kept)
             }
         }
     }
 
-    /// 1-based jump number within the rendered order, first nine only.
+    /// 1-based jump number among today's needs, first nine only.
     private func number(of item: ReminderSnapshot) -> Int? {
         guard ui.commandHeld else { return nil }
-        let rows = ui.renderedNeeds(model)
-        guard let index = rows.firstIndex(where: { $0.id == item.id }), index < 9 else { return nil }
+        guard let index = inbox.firstIndex(where: { $0.id == item.id }), index < 9 else { return nil }
         return index + 1
+    }
+
+    /// Row ids are namespaced per shelf: the same need id in two shelves
+    /// would make the lazy stack reuse the old row after a move.
+    private func rowID(_ id: String) -> String {
+        if model.inbox.contains(where: { $0.id == id }) { return "inbox-\(id)" }
+        if model.snoozed.contains(where: { $0.id == id }) { return "snoozed-\(id)" }
+        return "settled-\(id)"
     }
 }
 
 // MARK: - Rows
 
-/// 78pt card for an inbox need: list + title, overdue chip or hover actions.
+/// Inbox card: just the title. Nothing competes for attention; actions
+/// appear on hover at the trailing edge.
 struct NeedCard: View {
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
@@ -224,55 +233,33 @@ struct NeedCard: View {
     private var hovering: Bool { ui.hoveredID == snapshot.id }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(Color(hexString: snapshot.listColorHex) ?? Theme.accent)
-                        .frame(width: 7, height: 7)
-                    Text(snapshot.listTitle)
-                        .font(.system(size: 11))
-                        .foregroundStyle(Theme.sidebarMuted)
-                        .lineLimit(1)
-                }
-                Text(snapshot.title)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Theme.sidebarText)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        HStack(alignment: .center, spacing: 8) {
+            Text(snapshot.title)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Theme.sidebarText)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if hovering {
+                HoverActions(snapshot: snapshot, placement: .inbox)
             }
-            trailing
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 9)
-        .frame(height: Theme.cardHeight, alignment: .top)
+        .padding(.vertical, 10)
+        .frame(minHeight: 44)
         .background(rowBackground(isSelected: isSelected, hovering: hovering), in: RoundedRectangle(cornerRadius: Theme.radius))
         .contentShape(Rectangle())
         .onTapGesture { ui.open(.need(snapshot.id), model: model) }
         .onHover { ui.setHover(snapshot.id, $0) }
         .contextMenu { NeedActionMenu(snapshot: snapshot) }
-        .overlay(alignment: .bottomTrailing) { JumpBadge(number: number) }
+        .overlay(alignment: .trailing) { JumpBadge(number: number) }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(snapshot.title)
         .accessibilityAddTraits(.isButton)
     }
-
-    @ViewBuilder private var trailing: some View {
-        if hovering {
-            HoverActions(snapshot: snapshot, placement: .inbox)
-        } else if let due = snapshot.dueDate, Calendar.current.startOfDay(for: due) < Calendar.current.startOfDay(for: .now) {
-            Text(RelativeLabel.due(due))
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.orange)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(.orange.opacity(0.12), in: Capsule())
-        }
-    }
 }
 
-/// 36pt compact row for snoozed/settled needs: title + time, hover actions.
+/// 36pt compact row for snoozed/settled needs: title only, hover actions.
 struct NeedRow: View {
     enum Placement { case snoozed, settled }
 
@@ -280,24 +267,12 @@ struct NeedRow: View {
     @Environment(UIState.self) private var ui
     let snapshot: ReminderSnapshot
     let placement: Placement
-    let number: Int?
 
     private var isSelected: Bool { ui.selection == .need(snapshot.id) }
     private var hovering: Bool { ui.hoveredID == snapshot.id }
 
-    private var timeLabel: String {
-        switch placement {
-        case .snoozed: snapshot.dueDate.map { RelativeLabel.due($0) } ?? ""
-        case .settled: snapshot.completionDate.map { RelativeLabel.since($0) } ?? ""
-        }
-    }
-
     var body: some View {
         HStack(spacing: 8) {
-            Circle()
-                .fill(Color(hexString: snapshot.listColorHex) ?? Theme.accent)
-                .frame(width: 6, height: 6)
-                .opacity(0.7)
             Text(snapshot.title)
                 .font(.system(size: 13))
                 .foregroundStyle(Theme.sidebarMuted)
@@ -305,10 +280,6 @@ struct NeedRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             if hovering {
                 HoverActions(snapshot: snapshot, placement: placement == .snoozed ? .snoozed : .settled)
-            } else {
-                Text(timeLabel)
-                    .font(.system(size: 11))
-                    .foregroundStyle(Theme.sidebarMuted.opacity(0.8))
             }
         }
         .padding(.horizontal, 10)
@@ -318,7 +289,6 @@ struct NeedRow: View {
         .onTapGesture { ui.open(.need(snapshot.id), model: model) }
         .onHover { ui.setHover(snapshot.id, $0) }
         .contextMenu { NeedActionMenu(snapshot: snapshot) }
-        .overlay(alignment: .bottomTrailing) { JumpBadge(number: number) }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(snapshot.title)
         .accessibilityAddTraits(.isButton)
@@ -380,7 +350,7 @@ struct JumpBadge: View {
                 .padding(.vertical, 2)
                 .background(Theme.sidebarHover, in: RoundedRectangle(cornerRadius: 5))
                 .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Theme.border))
-                .padding(6)
+                .padding(.trailing, 8)
         }
     }
 }

@@ -24,14 +24,6 @@ struct TopBar: View {
                 .help("Show sidebar (⌘B)")
             }
             if let snapshot {
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(Color(hexString: snapshot.listColorHex) ?? Theme.accent)
-                        .frame(width: 7, height: 7)
-                    Text(snapshot.listTitle)
-                        .foregroundStyle(Theme.muted)
-                }
-                Text("/").foregroundStyle(Theme.muted.opacity(0.6))
                 if renaming {
                     TextField("Need title", text: $renameText)
                         .textFieldStyle(.plain)

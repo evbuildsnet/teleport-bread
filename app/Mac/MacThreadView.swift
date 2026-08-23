@@ -177,7 +177,8 @@ struct MacThreadView: View {
     }
 }
 
-/// A note in the log; "…" appears on hover → Edit · Copy · Delete.
+/// A note in the log with its actions as a quiet icon row beneath — no
+/// menu to hunt for on a desktop.
 struct NoteBubble: View {
     let message: String
     let highlighted: Bool
@@ -191,30 +192,31 @@ struct NoteBubble: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .background(highlighted ? Theme.accent.opacity(0.18) : Theme.bubble, in: RoundedRectangle(cornerRadius: 14))
-            Menu {
-                Button("Edit", action: onEdit)
-                Button("Copy") {
+            HStack(spacing: 2) {
+                action("pencil", "Edit note", onEdit)
+                action("doc.on.doc", "Copy note") {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(message, forType: .string)
                 }
-                Divider()
-                Button("Delete", role: .destructive, action: onDelete)
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Theme.muted)
-                    .frame(width: 28, height: 20)
-                    .contentShape(Rectangle())
+                action("trash", "Delete note", onDelete)
             }
-            .menuStyle(.button)
-            .buttonStyle(.plain)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .opacity(hovering ? 1 : 0)
-            .accessibilityLabel("Note actions")
+            .opacity(hovering ? 1 : 0.45)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .onHover { hovering = $0 }
+    }
+
+    private func action(_ symbol: String, _ label: String, _ run: @escaping () -> Void) -> some View {
+        Button(action: run) {
+            Image(systemName: symbol)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Theme.muted)
+                .frame(width: 24, height: 20)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(label)
+        .accessibilityLabel(label)
     }
 }
 

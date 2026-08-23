@@ -55,8 +55,12 @@ final class UIState {
     var composerFocusRequest = 0
     var composerSeed = ""
 
+    /// While a row's popover is open the cursor leaves the row; keep its
+    /// hover (and the button the popover hangs off) alive until it closes.
+    var hoverLockID: String?
+
     func setHover(_ id: String, _ inside: Bool) {
-        if inside { hoveredID = id } else if hoveredID == id { hoveredID = nil }
+        if inside { hoveredID = id } else if hoveredID == id, hoverLockID != id { hoveredID = nil }
     }
 
     static let settledInitialCount = 10
@@ -97,8 +101,9 @@ final class UIState {
         open(.need(rows[next].id), model: model)
     }
 
+    /// ⌘1…⌘9 index today's needs only (the inbox), never the shelves.
     func jump(to number: Int, in model: AppModel) {
-        let rows = renderedNeeds(model)
+        let rows = model.inbox.filter(model.matchesSearch)
         guard rows.indices.contains(number - 1) else { return }
         open(.need(rows[number - 1].id), model: model)
     }
@@ -116,7 +121,7 @@ final class UIState {
     // MARK: Selection changes keep drafts honest
 
     func open(_ target: Selection?, model: AppModel) {
-        hoveredID = nil
+        if hoverLockID == nil { hoveredID = nil }
         if target != selection, let draft = activeDraft, case .draft(draft.id) = selection {
             // Leaving the hero: keep non-empty work as a sidebar draft.
             model.stash(draft)

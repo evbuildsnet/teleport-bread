@@ -73,8 +73,8 @@ struct MainPane: View {
             } else {
                 empty("This need is no longer here.")
             }
-        case .draft:
-            DraftHero()
+        case .draft(let id):
+            DraftHero().id(id)
         case nil:
             empty(model.inbox.isEmpty ? "Inbox Zero. Nothing due." : "Select a need, or press ⌘N.")
         }
