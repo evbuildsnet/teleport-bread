@@ -140,6 +140,14 @@ final class AppModel {
             ?? settled.first { $0.id == id }
     }
 
+    /// Live placement of a need from section membership rather than snapshot
+    /// flags — a row can outlive the refresh that moved it.
+    func state(of id: String) -> NeedState? {
+        if settled.contains(where: { $0.id == id }) { return .settled }
+        if snoozed.contains(where: { $0.id == id }) { return .snoozed }
+        return inbox.contains(where: { $0.id == id }) ? .inbox : nil
+    }
+
     // MARK: Triage
 
     func settle(_ snapshot: ReminderSnapshot) async {

@@ -32,6 +32,18 @@ struct NeedActions {
         Task { await model.unsettle(snapshot) }
     }
 
+    /// Single entry point: surfaces hand a TriageAction here instead of
+    /// hand-wiring their own switch.
+    func perform(_ action: TriageAction, on snapshot: ReminderSnapshot) {
+        switch action {
+        case .settle: settle(snapshot)
+        case .wake: wake(snapshot)
+        case .unsettle: unsettle(snapshot)
+        case .snooze(let preset): snooze(snapshot, preset)
+        case .snoozePickDate: SnoozeDatePicker.present(for: snapshot, model: model, ui: ui)
+        }
+    }
+
     /// Settling/snoozing the open need moves selection to the next inbox need.
     private func advanceIfSelected(_ snapshot: ReminderSnapshot) {
         guard ui.selection == .need(snapshot.id) else { return }
@@ -48,23 +60,8 @@ struct NeedActionMenu: View {
 
     var body: some View {
         let actions = NeedActions(model: model, ui: ui)
-        // Live placement, not the snapshot's flag: a row can outlive a refresh.
-        let isSettled = model.settled.contains { $0.id == snapshot.id }
-        let isSnoozed = !isSettled && model.snoozed.contains { $0.id == snapshot.id }
-
-        if isSettled {
-            Button("Un-settle need") { actions.unsettle(snapshot) }
-        } else if isSnoozed {
-            Button("Wake need") { actions.wake(snapshot) }
-        } else {
-            Button("Settle need") { actions.settle(snapshot) }
-        }
-        Menu("Snooze") {
-            ForEach(SnoozePreset.allCases, id: \.self) { preset in
-                Button(preset.label) { actions.snooze(snapshot, preset) }
-            }
-            Divider()
-            Button("Pick date…") { SnoozeDatePicker.present(for: snapshot, model: model, ui: ui) }
+        TriageMenuItems(state: model.state(of: snapshot.id) ?? .inbox) {
+            actions.perform($0, on: snapshot)
         }
         Divider()
         if let onRename {
@@ -85,27 +82,19 @@ struct NeedActionMenu: View {
 /// Hover buttons at the trailing edge of a row (T3: clock + check on cards,
 /// wake / un-settle on compact rows).
 struct HoverActions: View {
-    enum Placement { case inbox, snoozed, settled }
-
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
     let snapshot: ReminderSnapshot
-    let placement: Placement
+    let placement: NeedState
     @State private var snoozeOpen = false
 
     var body: some View {
         let actions = NeedActions(model: model, ui: ui)
+        let primary = TriageAction.primary(for: placement)
         HStack(spacing: 2) {
-            switch placement {
-            case .inbox:
-                snoozeButton
-                iconButton("checkmark", help: "Settle") { actions.settle(snapshot) }
-            case .snoozed:
-                iconButton("sun.max", help: "Wake") { actions.wake(snapshot) }
-            case .settled:
-                iconButton("arrow.uturn.backward", help: "Un-settle") { actions.unsettle(snapshot) }
-                snoozeButton
-            }
+            if placement == .inbox { snoozeButton }
+            iconButton(primary.symbol, help: primary.label) { actions.perform(primary, on: snapshot) }
+            if placement == .settled { snoozeButton }
         }
     }
 
@@ -158,14 +147,18 @@ struct SnoozePopover: View {
                     dismiss()
                 } cancel: { picking = false }
             } else {
-                ForEach(SnoozePreset.allCases, id: \.self) { preset in
-                    menuRow(preset.label) {
-                        actions.snooze(snapshot, preset)
-                        dismiss()
+                ForEach(TriageAction.snoozeMenu) { action in
+                    if action == .snoozePickDate {
+                        Divider().padding(.vertical, 2)
+                        // Popovers can host the field inline; no panel needed.
+                        menuRow(action.label) { picking = true }
+                    } else {
+                        menuRow(action.label) {
+                            actions.perform(action, on: snapshot)
+                            dismiss()
+                        }
                     }
                 }
-                Divider().padding(.vertical, 2)
-                menuRow("Pick date…") { picking = true }
             }
         }
         .padding(8)

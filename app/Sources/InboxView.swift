@@ -105,14 +105,11 @@ struct InboxView: View {
             ),
             titleVisibility: .visible
         ) {
-            ForEach(SnoozePreset.allCases, id: \.self) { preset in
-                Button(preset.label) {
+            ForEach(TriageAction.snoozeMenu) { action in
+                Button(action.label) {
                     guard let target = snoozeTarget else { return }
-                    Task { await model.snooze(target, preset) }
+                    perform(action, on: target)
                 }
-            }
-            Button("Pick date…") {
-                datePickTarget = snoozeTarget
             }
         }
         .sheet(item: $datePickTarget) { target in
@@ -183,9 +180,18 @@ struct InboxView: View {
         }
     }
 
-    private enum Placement { case inbox, snoozed, settled }
+    /// One funnel for every surface (swipe, context menu, snooze dialog).
+    private func perform(_ action: TriageAction, on snapshot: ReminderSnapshot) {
+        switch action {
+        case .settle: Task { await model.settle(snapshot) }
+        case .wake: Task { await model.wake(snapshot) }
+        case .unsettle: Task { await model.unsettle(snapshot) }
+        case .snooze(let preset): Task { await model.snooze(snapshot, preset) }
+        case .snoozePickDate: datePickTarget = snapshot
+        }
+    }
 
-    private func row(_ snapshot: ReminderSnapshot, in placement: Placement, isLast: Bool = false) -> some View {
+    private func row(_ snapshot: ReminderSnapshot, in placement: NeedState, isLast: Bool = false) -> some View {
         let compact = placement != .inbox
         return Button {
             path.append(snapshot.id)
@@ -201,36 +207,26 @@ struct InboxView: View {
         .listRowSeparator(compact || isLast ? .hidden : .visible, edges: .bottom)
         .listRowSeparatorTint(.primary.opacity(0.08))
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            switch placement {
-            case .inbox:
-                settleButton(snapshot)
-                snoozeButton(snapshot)
-            case .snoozed:
-                Button {
-                    Task { await model.wake(snapshot) }
-                } label: {
-                    Label("Wake", systemImage: "sun.max")
-                }
-                .tint(.blue)
-            case .settled:
-                Button {
-                    Task { await model.unsettle(snapshot) }
-                } label: {
-                    Label("Un-settle", systemImage: "arrow.uturn.backward")
-                }
-                .tint(.orange)
-                snoozeButton(snapshot)
+            primaryButton(for: placement, snapshot)
+            if placement != .snoozed { snoozeButton(snapshot) }
+        }
+        // Settle stays swipe-only on inbox rows (habit by design); the menu
+        // offers it only where swiping already means something else.
+        .contextMenu {
+            TriageMenuItems(state: placement, includePrimary: placement != .inbox) {
+                perform($0, on: snapshot)
             }
         }
     }
 
-    private func settleButton(_ snapshot: ReminderSnapshot) -> some View {
-        Button {
-            Task { await model.settle(snapshot) }
+    private func primaryButton(for state: NeedState, _ snapshot: ReminderSnapshot) -> some View {
+        let action = TriageAction.primary(for: state)
+        return Button {
+            perform(action, on: snapshot)
         } label: {
-            Label("Settle", systemImage: "checkmark")
+            Label(action.label, systemImage: action.symbol)
         }
-        .tint(.blue)
+        .tint(state == .settled ? .orange : .blue)
     }
 
     private func snoozeButton(_ snapshot: ReminderSnapshot) -> some View {

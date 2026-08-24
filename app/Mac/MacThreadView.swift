@@ -14,7 +14,6 @@ struct MacThreadView: View {
     @FocusState private var composerFocused: Bool
 
     private var live: ReminderSnapshot { model.snapshot(id: snapshot.id) ?? snapshot }
-    private var isSnoozed: Bool { model.snoozed.contains { $0.id == snapshot.id } }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -99,9 +98,9 @@ struct MacThreadView: View {
 
     @ViewBuilder private var banner: some View {
         let actions = NeedActions(model: model, ui: ui)
-        if live.isCompleted {
+        if model.state(of: snapshot.id) == .settled || live.isCompleted {
             bannerRow("This need is settled.", button: "Un-settle") { actions.unsettle(live) }
-        } else if isSnoozed, let due = live.dueDate {
+        } else if model.state(of: snapshot.id) == .snoozed, let due = live.dueDate {
             bannerRow("Snoozed until \(due.formatted(.dateTime.weekday(.wide).month().day())).", button: "Wake now") { actions.wake(live) }
         }
     }
