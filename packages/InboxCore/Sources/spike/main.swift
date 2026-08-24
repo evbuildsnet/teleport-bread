@@ -27,21 +27,16 @@ func print(_ message: String) {
 /// separator visible, without creating anything.
 @MainActor
 func check() async {
-    let store = ReminderStore()
-    do {
-        guard try await store.requestAccess() else {
-            print("FAIL access: not granted")
-            exit(1)
-        }
-    } catch {
-        print("FAIL access: \(error)")
+    let source = EventKitSource()
+    guard await source.requestAccess() else {
+        print("FAIL access: not granted")
         exit(1)
     }
-    guard let list = store.lists.first(where: { $0.title == spikeListName }) else {
+    guard let list = source.lists.first(where: { $0.title == spikeListName }) else {
         print("FAIL check: list '\(spikeListName)' not found")
         exit(1)
     }
-    let reminders = await store.fetchIncomplete(in: [list])
+    let reminders = await source.fetchIncomplete(inLists: [list.id])
     for reminder in reminders {
         print("reminder: \(reminder.title)")
         let messages = reminder.messages
@@ -58,17 +53,14 @@ func check() async {
     exit(0)
 }
 
+/// List creation is raw-EventKit setup tooling, deliberately outside the
+/// NeedSource surface. Runs before the EventKitSource under test is made so
+/// the fresh instance sees the list.
 @MainActor
-func run() async {
-    if CommandLine.arguments.contains("--check") {
-        await check()
-        return
-    }
-    let store = ReminderStore()
-
+func ensureSpikeList() async -> String {
+    let store = EKEventStore()
     do {
-        let granted = try await store.requestAccess()
-        guard granted else {
+        guard try await store.requestFullAccessToReminders() else {
             print("FAIL access: not granted")
             exit(1)
         }
@@ -78,33 +70,40 @@ func run() async {
         exit(1)
     }
 
-    print("Lists visible: \(store.lists.map(\.title).joined(separator: ", "))")
-
-    // Find or create the spike list.
-    let spikeList: EKCalendar
-    if let existing = store.lists.first(where: { $0.title == spikeListName }) {
-        spikeList = existing
+    if let existing = store.calendars(for: .reminder).first(where: { $0.title == spikeListName }) {
         print("OK reusing list \(spikeListName)")
-    } else {
-        let calendar = EKCalendar(for: .reminder, eventStore: store.store)
-        calendar.title = spikeListName
-        guard let source = store.store.defaultCalendarForNewReminders()?.source
-                ?? store.store.sources.first(where: { $0.sourceType == .calDAV })
-                ?? store.store.sources.first
-        else {
-            print("FAIL no reminder source available")
-            exit(1)
-        }
-        calendar.source = source
-        do {
-            try store.store.saveCalendar(calendar, commit: true)
-            print("OK created list \(spikeListName) in source \(source.title)")
-        } catch {
-            print("FAIL creating list: \(error)")
-            exit(1)
-        }
-        spikeList = calendar
+        return existing.calendarIdentifier
     }
+    let calendar = EKCalendar(for: .reminder, eventStore: store)
+    calendar.title = spikeListName
+    guard let source = store.defaultCalendarForNewReminders()?.source
+            ?? store.sources.first(where: { $0.sourceType == .calDAV })
+            ?? store.sources.first
+    else {
+        print("FAIL no reminder source available")
+        exit(1)
+    }
+    calendar.source = source
+    do {
+        try store.saveCalendar(calendar, commit: true)
+        print("OK created list \(spikeListName) in source \(source.title)")
+    } catch {
+        print("FAIL creating list: \(error)")
+        exit(1)
+    }
+    return calendar.calendarIdentifier
+}
+
+@MainActor
+func run() async {
+    if CommandLine.arguments.contains("--check") {
+        await check()
+        return
+    }
+    let spikeListID = await ensureSpikeList()
+
+    let source = EventKitSource()
+    print("Lists visible: \(source.lists.map(\.title).joined(separator: ", "))")
 
     // Create a reminder with a date-only due date and a two-message log.
     let stamp = ISO8601DateFormatter().string(from: .now)
@@ -114,11 +113,11 @@ func run() async {
     )
     let snapshot: ReminderSnapshot
     do {
-        snapshot = try store.createReminder(
+        snapshot = try await source.create(
             title: "Spike \(stamp)",
             note: note,
             due: .now,
-            in: spikeList
+            inList: spikeListID
         )
         print("OK created reminder \(snapshot.id)")
     } catch {
@@ -127,7 +126,7 @@ func run() async {
     }
 
     // Read back through a fresh fetch and verify.
-    let fetched = await store.fetchIncomplete(in: [spikeList])
+    let fetched = await source.fetchIncomplete(inLists: [spikeListID])
     guard let roundtrip = fetched.first(where: { $0.id == snapshot.id }) else {
         print("FAIL roundtrip: created reminder not returned by incomplete fetch")
         exit(1)

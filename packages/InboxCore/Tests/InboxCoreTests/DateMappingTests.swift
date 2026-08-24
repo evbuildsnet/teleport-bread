@@ -8,7 +8,7 @@ import Testing
         gregorian.timeZone = .current
         let date = gregorian.date(from: DateComponents(year: 2026, month: 8, day: 21, hour: 15))!
 
-        let components = ReminderStore.dateOnlyComponents(from: date)
+        let components = EventKitSource.dateOnlyComponents(from: date)
         #expect(components.calendar?.identifier == .gregorian)
         #expect(components.year == 2026)
         #expect(components.month == 8)
@@ -25,7 +25,7 @@ import Testing
         components.calendar = tokyo
         components.timeZone = tokyo.timeZone
 
-        let due = ReminderStore.localDueDate(from: components)
+        let due = EventKitSource.localDueDate(from: components)
         let local = Calendar.current.dateComponents([.year, .month, .day], from: due!)
         #expect(local.year == 2026)
         #expect(local.month == 8)
@@ -34,7 +34,7 @@ import Testing
     }
 
     @Test func localDueDateWithoutCalendarDefaultsToGregorian() {
-        let due = ReminderStore.localDueDate(
+        let due = EventKitSource.localDueDate(
             from: DateComponents(year: 2026, month: 12, day: 31)
         )
         let local = Calendar.current.dateComponents([.year, .month, .day], from: due!)
@@ -44,6 +44,6 @@ import Testing
     }
 
     @Test func localDueDateWithMissingDayIsNil() {
-        #expect(ReminderStore.localDueDate(from: DateComponents(year: 2026)) == nil)
+        #expect(EventKitSource.localDueDate(from: DateComponents(year: 2026)) == nil)
     }
 }
