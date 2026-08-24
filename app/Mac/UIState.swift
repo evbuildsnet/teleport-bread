@@ -65,6 +65,7 @@ final class UIState {
         if inside { hoveredID = id } else if hoveredID == id, hoverLockID != id { hoveredID = nil }
     }
 
+    /// Deliberately taller first page than iOS's 5 — desktop screen.
     static let settledInitialCount = 10
     static let settledPageCount = 25
 
@@ -80,12 +81,12 @@ final class UIState {
     /// Needs currently rendered in the sidebar, top to bottom. Collapsed
     /// shelves and unpaged settled rows don't participate (T3 behaviour).
     func renderedNeeds(_ model: AppModel) -> [ReminderSnapshot] {
-        var rows = model.inbox.filter(model.matchesSearch)
+        var rows = model.visibleInbox
         if snoozedExpanded || model.isSearching {
-            rows += model.snoozed.filter(model.matchesSearch)
+            rows += model.visibleSnoozed
         }
         if settledExpanded || model.isSearching {
-            rows += model.settled.filter(model.matchesSearch).prefix(settledShown)
+            rows += model.visibleSettled.prefix(settledShown)
         }
         return rows
     }
@@ -104,7 +105,7 @@ final class UIState {
 
     /// ⌘1…⌘9 index today's needs only (the inbox), never the shelves.
     func jump(to number: Int, in model: AppModel) {
-        let rows = model.inbox.filter(model.matchesSearch)
+        let rows = model.visibleInbox
         guard rows.indices.contains(number - 1) else { return }
         open(.need(rows[number - 1].id), model: model)
     }
@@ -112,7 +113,7 @@ final class UIState {
     /// After settling/snoozing the open need, land on the next remaining
     /// inbox need (T3: "navigates to the next remaining active card").
     func selectionAfterRemoving(_ id: String, in model: AppModel) -> Selection? {
-        let inbox = model.inbox.filter(model.matchesSearch)
+        let inbox = model.visibleInbox
         guard let index = inbox.firstIndex(where: { $0.id == id }) else { return selection }
         let remaining = inbox.filter { $0.id != id }
         guard !remaining.isEmpty else { return nil }

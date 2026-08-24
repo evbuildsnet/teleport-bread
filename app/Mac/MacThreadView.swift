@@ -9,8 +9,7 @@ struct MacThreadView: View {
     @Environment(UIState.self) private var ui
     let snapshot: ReminderSnapshot
 
-    @State private var draft = ""
-    @State private var editingIndex: Int?
+    @State private var messageComposer = MessageComposer()
     @FocusState private var composerFocused: Bool
 
     private var live: ReminderSnapshot { model.snapshot(id: snapshot.id) ?? snapshot }
@@ -25,7 +24,7 @@ struct MacThreadView: View {
         }
         .onChange(of: ui.composerFocusRequest) { _, _ in
             guard ui.selection == .need(snapshot.id) else { return }
-            draft += ui.composerSeed
+            messageComposer.draft += ui.composerSeed
             ui.composerSeed = ""
             composerFocused = true
         }
@@ -52,8 +51,11 @@ struct MacThreadView: View {
                     ForEach(Array(messages.enumerated()), id: \.offset) { index, message in
                         NoteBubble(
                             message: message,
-                            highlighted: editingIndex == index,
-                            onEdit: { beginEditing(index, message) },
+                            highlighted: messageComposer.editingIndex == index,
+                            onEdit: {
+                                messageComposer.beginEditing(index, message)
+                                composerFocused = true
+                            },
                             onDelete: { Task { await model.deleteMessage(at: index, in: live) } }
                         )
                         .id(index)
@@ -79,16 +81,17 @@ struct MacThreadView: View {
     // MARK: Composer
 
     private var composer: some View {
-        VStack(spacing: 8) {
+        @Bindable var messageComposer = messageComposer
+        return VStack(spacing: 8) {
             banner
             Composer(
-                text: $draft,
+                text: $messageComposer.draft,
                 placeholder: "Leave a thought for your future self.",
                 focused: $composerFocused,
                 accessory: { editingAccessory },
-                sendSymbol: editingIndex == nil ? "arrow.up" : "checkmark",
-                canSend: !sanitizedDraft.isEmpty,
-                onSend: send
+                sendSymbol: messageComposer.isEditing ? "checkmark" : "arrow.up",
+                canSend: !messageComposer.sanitizedDraft.isEmpty,
+                onSend: { messageComposer.send(to: live, via: model) }
             )
         }
         .frame(maxWidth: Theme.columnMaxWidth)
@@ -122,13 +125,13 @@ struct MacThreadView: View {
     }
 
     @ViewBuilder private var editingAccessory: some View {
-        if editingIndex != nil {
+        if messageComposer.isEditing {
             HStack(spacing: 6) {
                 Image(systemName: "pencil")
                 Text("Editing note")
                 Spacer()
                 Button {
-                    cancelEditing()
+                    messageComposer.cancelEditing()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                 }
@@ -137,41 +140,6 @@ struct MacThreadView: View {
             }
             .font(.system(size: 12))
             .foregroundStyle(Theme.muted)
-        }
-    }
-
-    private var sanitizedDraft: String {
-        draft
-            .replacingOccurrences(of: String(NoteCodec.invisibleSeparator), with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func beginEditing(_ index: Int, _ message: String) {
-        editingIndex = index
-        draft = message
-        composerFocused = true
-    }
-
-    private func cancelEditing() {
-        editingIndex = nil
-        draft = ""
-    }
-
-    private func send() {
-        let message = sanitizedDraft
-        guard !message.isEmpty else { return }
-        let target = live
-        if let index = editingIndex {
-            editingIndex = nil
-            draft = ""
-            Task { await model.replaceMessage(at: index, with: message, in: target) }
-            return
-        }
-        draft = ""
-        Task {
-            if await !model.append(message, to: target), draft.isEmpty {
-                draft = message
-            }
         }
     }
 }

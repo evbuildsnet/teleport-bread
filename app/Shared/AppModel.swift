@@ -30,9 +30,20 @@ final class AppModel {
     /// Bumped on every successful triage action; drives haptic feedback.
     private(set) var triageCount = 0
 
-    /// nil = all lists. Persisted per device.
+    /// nil = all lists. Persisted per device; changing it refreshes, so no
+    /// call site has to remember to.
     var selectedListIDs: Set<String>? {
-        didSet { persistSelection() }
+        didSet {
+            persistSelection()
+            guard oldValue != selectedListIDs else { return }
+            Task { await refresh() }
+        }
+    }
+
+    func toggleList(_ id: String) {
+        var selection = selectedListIDs ?? []
+        if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
+        selectedListIDs = selection.isEmpty ? nil : selection
     }
 
     var listOptions: [ListOption] { source.lists }
@@ -121,6 +132,13 @@ final class AppModel {
     }
 
     var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    // MARK: Search-visible collections (one filter, every surface)
+
+    var visibleInbox: [ReminderSnapshot] { inbox.filter(matchesSearch) }
+    var visibleSnoozed: [ReminderSnapshot] { snoozed.filter(matchesSearch) }
+    var visibleSettled: [ReminderSnapshot] { settled.filter(matchesSearch) }
+    var visibleDrafts: [NeedDraft] { drafts.filter(matchesSearch) }
 
     func matchesSearch(_ snapshot: ReminderSnapshot) -> Bool {
         let query = searchText.trimmingCharacters(in: .whitespaces)

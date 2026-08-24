@@ -111,7 +111,6 @@ struct FilterSheet: View {
             List {
                 Button {
                     model.selectedListIDs = nil
-                    Task { await model.refresh() }
                 } label: {
                     HStack {
                         Text("All lists").foregroundStyle(.primary)
@@ -123,7 +122,7 @@ struct FilterSheet: View {
                 }
                 ForEach(model.listOptions) { list in
                     Button {
-                        toggle(list.id)
+                        model.toggleList(list.id)
                     } label: {
                         HStack(spacing: 12) {
                             Circle()
@@ -147,16 +146,5 @@ struct FilterSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
-    }
-
-    private func toggle(_ id: String) {
-        var selection = model.selectedListIDs ?? []
-        if selection.contains(id) {
-            selection.remove(id)
-        } else {
-            selection.insert(id)
-        }
-        model.selectedListIDs = selection.isEmpty ? nil : selection
-        Task { await model.refresh() }
     }
 }

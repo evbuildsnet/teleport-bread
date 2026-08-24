@@ -10,6 +10,7 @@ struct InboxView: View {
     @State private var showFilter = false
     @State private var snoozedExpanded = false
     @State private var settledExpanded = false
+    /// Deliberately smaller first page than Mac's 10: a phone screen.
     @State private var settledShown = 5
 
     // Compose sheet state. `composeOutcome` distinguishes an explicit
@@ -24,10 +25,10 @@ struct InboxView: View {
     @State private var pullArmed = false
     private let pullThreshold: CGFloat = 96
 
-    private var drafts: [NeedDraft] { model.drafts.filter(model.matchesSearch) }
-    private var inbox: [ReminderSnapshot] { model.inbox.filter(model.matchesSearch) }
-    private var snoozed: [ReminderSnapshot] { model.snoozed.filter(model.matchesSearch) }
-    private var settled: [ReminderSnapshot] { model.settled.filter(model.matchesSearch) }
+    private var drafts: [NeedDraft] { model.visibleDrafts }
+    private var inbox: [ReminderSnapshot] { model.visibleInbox }
+    private var snoozed: [ReminderSnapshot] { model.visibleSnoozed }
+    private var settled: [ReminderSnapshot] { model.visibleSettled }
     private var nothingMatches: Bool {
         drafts.isEmpty && inbox.isEmpty && snoozed.isEmpty && settled.isEmpty
     }

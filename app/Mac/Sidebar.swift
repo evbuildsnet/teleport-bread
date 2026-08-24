@@ -9,15 +9,15 @@ struct Sidebar: View {
     @FocusState private var searchFocused: Bool
 
     private var drafts: [NeedDraft] {
-        var rows = model.drafts.filter(model.matchesSearch)
+        var rows = model.visibleDrafts
         if let active = ui.activeDraft, !model.drafts.contains(where: { $0.id == active.id }) {
             rows.insert(active, at: 0)
         }
         return rows
     }
-    private var inbox: [ReminderSnapshot] { model.inbox.filter(model.matchesSearch) }
-    private var snoozed: [ReminderSnapshot] { model.snoozed.filter(model.matchesSearch) }
-    private var settled: [ReminderSnapshot] { model.settled.filter(model.matchesSearch) }
+    private var inbox: [ReminderSnapshot] { model.visibleInbox }
+    private var snoozed: [ReminderSnapshot] { model.visibleSnoozed }
+    private var settled: [ReminderSnapshot] { model.visibleSettled }
     private var selectedID: String? { ui.selection?.needID }
 
     var body: some View {
@@ -404,14 +404,13 @@ struct ListFilterMenu: View {
         Menu {
             Button {
                 model.selectedListIDs = nil
-                Task { await model.refresh() }
             } label: {
                 if model.selectedListIDs == nil { Label("All lists", systemImage: "checkmark") } else { Text("All lists") }
             }
             Divider()
             ForEach(model.listOptions) { list in
                 Button {
-                    toggle(list.id)
+                    model.toggleList(list.id)
                 } label: {
                     if model.selectedListIDs?.contains(list.id) == true {
                         Label(list.title, systemImage: "checkmark")
@@ -440,12 +439,5 @@ struct ListFilterMenu: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .accessibilityLabel("Filter lists")
-    }
-
-    private func toggle(_ id: String) {
-        var selection = model.selectedListIDs ?? []
-        if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
-        model.selectedListIDs = selection.isEmpty ? nil : selection
-        Task { await model.refresh() }
     }
 }

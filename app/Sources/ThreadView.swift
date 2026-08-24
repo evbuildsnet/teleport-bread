@@ -8,8 +8,7 @@ struct ThreadView: View {
     @Environment(AppModel.self) private var model
     let reminderID: String
 
-    @State private var draft = ""
-    @State private var editingIndex: Int?
+    @State private var composer = MessageComposer()
     @FocusState private var inputFocused: Bool
 
     // Title/list edit sheet (reuses the compose sheet in edit mode).
@@ -43,12 +42,13 @@ struct ThreadView: View {
                                     .padding(.horizontal, 14)
                                     .padding(.vertical, 10)
                                     .background(
-                                        editingIndex == index ? AnyShapeStyle(.tint.opacity(0.15)) : AnyShapeStyle(.quaternary.opacity(0.5)),
+                                        composer.editingIndex == index ? AnyShapeStyle(.tint.opacity(0.15)) : AnyShapeStyle(.quaternary.opacity(0.5)),
                                         in: RoundedRectangle(cornerRadius: 14)
                                     )
                                 Menu {
                                     Button {
-                                        beginEditing(index, message)
+                                        composer.beginEditing(index, message)
+                                        inputFocused = true
                                     } label: {
                                         Label("Edit", systemImage: "pencil")
                                     }
@@ -93,6 +93,7 @@ struct ThreadView: View {
                 }
             }
 
+            banner
             inputBar
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -122,18 +123,53 @@ struct ThreadView: View {
         Task { await model.update(snapshot, title: editDraft.title, listID: editDraft.listID) }
     }
 
+    // MARK: Banner (parity with Mac: appending to a snoozed/settled need
+    // shouldn't be a surprise)
+
+    @ViewBuilder private var banner: some View {
+        if let snapshot {
+            if model.state(of: snapshot.id) == .settled || snapshot.isCompleted {
+                bannerRow("This need is settled.", button: "Un-settle") {
+                    Task { await model.unsettle(snapshot) }
+                }
+            } else if model.state(of: snapshot.id) == .snoozed, let due = snapshot.dueDate {
+                bannerRow("Snoozed until \(due.formatted(.dateTime.weekday(.wide).month().day())).", button: "Wake") {
+                    Task { await model.wake(snapshot) }
+                }
+            }
+        }
+    }
+
+    private func bannerRow(_ text: String, button: String, action: @escaping () -> Void) -> some View {
+        HStack {
+            Text(text)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button(button, action: action)
+                .buttonStyle(.plain)
+                .foregroundStyle(.tint)
+        }
+        .font(.footnote.weight(.medium))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 4)
+    }
+
     // MARK: Composer
 
     /// Multiline composer with the send control anchored to the bottom edge.
     private var inputBar: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if editingIndex != nil {
+        @Bindable var composer = composer
+        return VStack(alignment: .leading, spacing: 8) {
+            if composer.isEditing {
                 HStack(spacing: 6) {
                     Image(systemName: "pencil")
                     Text("Editing note")
                     Spacer()
                     Button {
-                        cancelEditing()
+                        composer.cancelEditing()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                     }
@@ -143,21 +179,21 @@ struct ThreadView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             }
-            TextField("Message to your future self", text: $draft, axis: .vertical)
+            TextField("Message to your future self", text: $composer.draft, axis: .vertical)
                 .lineLimit(1...8)
                 .focused($inputFocused)
             HStack {
                 Spacer()
                 Button(action: send) {
-                    Image(systemName: editingIndex == nil ? "arrow.up" : "checkmark")
+                    Image(systemName: composer.isEditing ? "checkmark" : "arrow.up")
                         .font(.body.weight(.semibold))
                         .frame(width: 34, height: 34)
-                        .background(sanitizedDraft.isEmpty ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.tint), in: Circle())
-                        .foregroundStyle(sanitizedDraft.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.white))
+                        .background(composer.sanitizedDraft.isEmpty ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.tint), in: Circle())
+                        .foregroundStyle(composer.sanitizedDraft.isEmpty ? AnyShapeStyle(.secondary) : AnyShapeStyle(.white))
                 }
                 .buttonStyle(.plain)
-                .disabled(sanitizedDraft.isEmpty)
-                .accessibilityLabel(editingIndex == nil ? "Append message" : "Save message")
+                .disabled(composer.sanitizedDraft.isEmpty)
+                .accessibilityLabel(composer.isEditing ? "Save message" : "Append message")
             }
         }
         .padding(14)
@@ -166,42 +202,9 @@ struct ThreadView: View {
         .padding(.bottom, 8)
     }
 
-    /// U+2063 is invisible and not in .whitespacesAndNewlines — without
-    /// stripping it first, a pasted invisible-only draft would append a
-    /// permanently empty message.
-    private var sanitizedDraft: String {
-        draft
-            .replacingOccurrences(of: String(NoteCodec.invisibleSeparator), with: "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func beginEditing(_ index: Int, _ message: String) {
-        editingIndex = index
-        draft = message
-        inputFocused = true
-    }
-
-    private func cancelEditing() {
-        editingIndex = nil
-        draft = ""
-    }
-
     private func send() {
         guard let snapshot else { return }
-        let message = sanitizedDraft
-        guard !message.isEmpty else { return }
-        if let index = editingIndex {
-            editingIndex = nil
-            draft = ""
-            Task { await model.replaceMessage(at: index, with: message, in: snapshot) }
-            return
-        }
-        draft = ""
-        Task {
-            if await !model.append(message, to: snapshot), draft.isEmpty {
-                draft = message
-            }
-        }
+        composer.send(to: snapshot, via: model)
     }
 }
 
