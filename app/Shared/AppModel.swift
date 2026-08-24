@@ -105,8 +105,31 @@ final class AppModel {
 
     // MARK: Data
 
+    private var activeRefresh: Task<Void, Never>?
+    private var refreshQueued = false
+
+    /// Coalesced: one fetch pass in flight at a time. A request arriving
+    /// mid-run (our own post-write refresh racing EKEventStoreChanged) queues
+    /// exactly one follow-up pass instead of interleaving, so a stale fetch
+    /// can never overwrite a fresher one.
     func refresh() async {
         guard phase == .ready, !isPreview else { return }
+        if let activeRefresh {
+            refreshQueued = true
+            await activeRefresh.value
+            return
+        }
+        let task = Task { await performRefresh() }
+        activeRefresh = task
+        await task.value
+        activeRefresh = nil
+        if refreshQueued {
+            refreshQueued = false
+            await refresh()
+        }
+    }
+
+    private func performRefresh() async {
         let calendars = selectedCalendars()
         let sections = engine.sections(from: await store.fetchIncomplete(in: calendars), today: .now)
         inbox = sections.inbox
@@ -207,18 +230,25 @@ final class AppModel {
     }
 
     /// Edit title and/or list from the compose sheet in edit mode.
-    func update(_ snapshot: ReminderSnapshot, title: String, listID: String?) async {
+    /// Returns false when the write failed so the edit isn't silently dropped.
+    @discardableResult
+    func update(_ snapshot: ReminderSnapshot, title: String, listID: String?) async -> Bool {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
+        guard !trimmed.isEmpty else { return false }
         if isPreview {
             let list = previewLists.first { $0.id == listID }
             previewReplace(snapshot, with: snapshot.with(
                 listID: list?.id, listTitle: list?.title, title: trimmed
             ))
-            return
+            return true
         }
-        try? store.update(id: snapshot.id, title: trimmed, listID: listID)
+        do {
+            try store.update(id: snapshot.id, title: trimmed, listID: listID)
+        } catch {
+            return false
+        }
         await refresh()
+        return true
     }
 
     /// Explicit history edits, requested by the user via long-press.
@@ -281,24 +311,34 @@ final class AppModel {
 
     /// Creates the need. Capture always sets a due date (today) so it is
     /// immediately visible; undated needs are invisible by design.
-    func send(_ draft: NeedDraft) async {
+    /// The draft is only discarded once the write succeeds — on failure it is
+    /// stashed into Drafts, so the user's text is never silently lost.
+    @discardableResult
+    func send(_ draft: NeedDraft) async -> Bool {
         let title = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty else { return }
-        discard(draft)
+        guard !title.isEmpty else { return false }
         UserDefaults.standard.set(draft.listID, forKey: Self.lastListKey)
         if isPreview {
+            discard(draft)
             let list = previewLists.first { $0.id == draft.listID } ?? previewLists.first
             previewReplace(nil, with: ReminderSnapshot(
                 id: UUID().uuidString, listID: list?.id ?? "preview",
                 listTitle: list?.title ?? "Inbox", listColorHex: list?.colorHex,
                 title: title, dueDate: Calendar.current.startOfDay(for: .now), creationDate: .now
             ))
-            return
+            return true
         }
         // Fall back to a list the active filter can actually show.
         let target = draft.listID.flatMap(store.list(withIdentifier:)) ?? selectedCalendars()?.first
-        try? store.createReminder(title: title, due: .now, in: target)
+        do {
+            try store.createReminder(title: title, due: .now, in: target)
+        } catch {
+            stash(draft)
+            return false
+        }
+        discard(draft)
         await refresh()
+        return true
     }
 
     // MARK: List selection persistence
