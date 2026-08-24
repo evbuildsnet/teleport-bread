@@ -59,12 +59,11 @@ final class AppModel {
     func start() async {
         guard !started else { return }
         started = true
-        if source.isAuthorized {
-            phase = .ready
-        } else {
-            phase = .needsAccess
-            phase = await source.requestAccess() ? .ready : .denied
-        }
+        // requestAccess is always called: when access is already granted it
+        // resolves instantly with no prompt, and it gives the source its
+        // activation hook (e.g. simulator seeding) on every path.
+        if !source.isAuthorized { phase = .needsAccess }
+        phase = await source.requestAccess() ? .ready : .denied
         guard phase == .ready else { return }
 
         restoreSelection()
@@ -89,26 +88,30 @@ final class AppModel {
     // MARK: Data
 
     private var activeRefresh: Task<Void, Never>?
-    private var refreshQueued = false
+    private var appliedGeneration = 0
 
-    /// Coalesced: one fetch pass in flight at a time. A request arriving
-    /// mid-run (our own post-write refresh racing a source change signal)
-    /// queues exactly one follow-up pass instead of interleaving, so a stale
-    /// fetch can never overwrite a fresher one.
+    /// Coalesced: one fetch pass in flight at a time, so a stale fetch can
+    /// never overwrite a fresher one. A pass already in flight may have
+    /// fetched before the caller's write landed, so refresh() only returns
+    /// once a pass that STARTED at-or-after the call has been applied —
+    /// callers can rely on seeing their own writes.
     func refresh() async {
         guard phase == .ready else { return }
-        if let activeRefresh {
-            refreshQueued = true
-            await activeRefresh.value
-            return
-        }
-        let task = Task { await performRefresh() }
-        activeRefresh = task
-        await task.value
-        activeRefresh = nil
-        if refreshQueued {
-            refreshQueued = false
-            await refresh()
+        let target = appliedGeneration + (activeRefresh == nil ? 1 : 2)
+        while appliedGeneration < target {
+            if let running = activeRefresh {
+                await running.value
+            } else {
+                let task = Task {
+                    await self.performRefresh()
+                    // Bookkeeping inside the task: it lands before any
+                    // awaiter resumes, so no one ever awaits a finished task.
+                    self.appliedGeneration += 1
+                    self.activeRefresh = nil
+                }
+                activeRefresh = task
+                await task.value
+            }
         }
     }
 
@@ -225,23 +228,31 @@ final class AppModel {
     }
 
     /// Explicit history edits, requested by the user via long-press.
-    func replaceMessage(at index: Int, with text: String, in snapshot: ReminderSnapshot) async {
+    /// Returns false when the write failed so the edit can be handed back.
+    @discardableResult
+    func replaceMessage(at index: Int, with text: String, in snapshot: ReminderSnapshot) async -> Bool {
         var messages = snapshot.messages
-        guard messages.indices.contains(index) else { return }
+        guard messages.indices.contains(index) else { return false }
         messages[index] = text
-        await setMessages(messages, in: snapshot)
+        return await setMessages(messages, in: snapshot)
     }
 
-    func deleteMessage(at index: Int, in snapshot: ReminderSnapshot) async {
+    @discardableResult
+    func deleteMessage(at index: Int, in snapshot: ReminderSnapshot) async -> Bool {
         var messages = snapshot.messages
-        guard messages.indices.contains(index) else { return }
+        guard messages.indices.contains(index) else { return false }
         messages.remove(at: index)
-        await setMessages(messages, in: snapshot)
+        return await setMessages(messages, in: snapshot)
     }
 
-    private func setMessages(_ messages: [String], in snapshot: ReminderSnapshot) async {
-        try? await source.setNote(id: snapshot.id, note: NoteCodec.join(messages))
+    private func setMessages(_ messages: [String], in snapshot: ReminderSnapshot) async -> Bool {
+        do {
+            try await source.setNote(id: snapshot.id, note: NoteCodec.join(messages))
+        } catch {
+            return false
+        }
         await refresh()
+        return true
     }
 
     // MARK: Drafts & capture

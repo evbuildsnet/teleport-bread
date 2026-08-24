@@ -31,15 +31,21 @@ final class MessageComposer {
         draft = ""
     }
 
-    /// Append, or save the message being edited. On a failed append the text
-    /// is handed back to the (still empty) draft so it is never silently lost.
+    /// Append, or save the message being edited. On a failed write the text
+    /// is handed back to the (still idle) composer so it is never silently
+    /// lost.
     func send(to snapshot: ReminderSnapshot, via model: AppModel) {
         let message = sanitizedDraft
         guard !message.isEmpty else { return }
         if let index = editingIndex {
             editingIndex = nil
             draft = ""
-            Task { await model.replaceMessage(at: index, with: message, in: snapshot) }
+            Task {
+                if await !model.replaceMessage(at: index, with: message, in: snapshot),
+                   draft.isEmpty, editingIndex == nil {
+                    beginEditing(index, message)
+                }
+            }
             return
         }
         draft = ""

@@ -120,7 +120,14 @@ struct ThreadView: View {
 
     private func finishEdit() {
         guard editOutcome == .sent, let snapshot else { return }
-        Task { await model.update(snapshot, title: editDraft.title, listID: editDraft.listID) }
+        Task {
+            // A failed write re-opens the sheet with the edit intact rather
+            // than silently reverting the title.
+            if await !model.update(snapshot, title: editDraft.title, listID: editDraft.listID) {
+                editOutcome = .dismissed
+                editing = true
+            }
+        }
     }
 
     // MARK: Banner (parity with Mac: appending to a snoozed/settled need

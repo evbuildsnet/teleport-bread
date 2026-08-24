@@ -70,6 +70,14 @@ struct TopBar: View {
         renaming = false
         let title = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty, title != snapshot.title else { return }
-        Task { await model.update(snapshot, title: title, listID: snapshot.listID) }
+        Task {
+            // A failed write re-enters rename with the text intact rather
+            // than silently reverting the title.
+            if await !model.update(snapshot, title: title, listID: snapshot.listID), !renaming {
+                renameText = title
+                renaming = true
+                renameFocused = true
+            }
+        }
     }
 }
