@@ -80,7 +80,8 @@ struct NeedActionMenu: View {
 }
 
 /// Hover buttons at the trailing edge of a row (T3: clock + check on cards,
-/// wake / un-settle on compact rows).
+/// wake / un-settle on compact rows), as a small floating toolbar: it reads
+/// as a control sitting over the row rather than a smear across the title.
 struct HoverActions: View {
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
@@ -96,6 +97,10 @@ struct HoverActions: View {
             iconButton(primary.symbol, help: primary.label) { actions.perform(primary, on: snapshot) }
             if placement == .settled { snoozeButton }
         }
+        .padding(2)
+        .background(Theme.overlay, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.border))
+        .shadow(color: .black.opacity(0.14), radius: 4, y: 1)
     }
 
     private var snoozeButton: some View {

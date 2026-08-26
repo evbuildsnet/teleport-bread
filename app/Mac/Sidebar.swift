@@ -247,12 +247,12 @@ struct NeedCard: View {
             // change a row's height (the list would jump under the cursor).
             .frame(height: 54)
             .background(rowBackground(isSelected: isSelected, hovering: hovering), in: RoundedRectangle(cornerRadius: Theme.radius))
-            // Actions float over the title instead of squeezing it.
+            // Actions float over the title instead of squeezing it (the
+            // row never changes height or reflows under the cursor).
             .overlay(alignment: .trailing) {
                 if hovering {
                     HoverActions(snapshot: snapshot, placement: .inbox)
-                        .padding(.trailing, 6)
-                        .background(actionsBackdrop(rowBackground(isSelected: isSelected, hovering: hovering)))
+                        .padding(.trailing, 4)
                 }
             }
             .zIndex(hovering ? 1 : 0)
@@ -291,8 +291,7 @@ struct NeedRow: View {
             .overlay(alignment: .trailing) {
                 if hovering {
                     HoverActions(snapshot: snapshot, placement: placement == .snoozed ? .snoozed : .settled)
-                        .padding(.trailing, 6)
-                        .background(actionsBackdrop(rowBackground(isSelected: isSelected, hovering: hovering)))
+                        .padding(.trailing, 4)
                 }
             }
             .zIndex(hovering ? 1 : 0)
@@ -348,17 +347,6 @@ struct DraftRow: View {
 
 private func rowBackground(isSelected: Bool, hovering: Bool) -> Color {
     isSelected ? Theme.sidebarSelected : hovering ? Theme.sidebarHover : .clear
-}
-
-/// Solid behind the buttons, fading out to the left so covered text ends
-/// softly rather than with a hard edge.
-private func actionsBackdrop(_ color: Color) -> some View {
-    HStack(spacing: 0) {
-        LinearGradient(colors: [color.opacity(0), color], startPoint: .leading, endPoint: .trailing)
-            .frame(width: 28)
-        color
-    }
-    .padding(.leading, -28)
 }
 
 struct JumpBadge: View {

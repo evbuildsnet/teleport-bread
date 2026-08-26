@@ -144,8 +144,8 @@ struct MacThreadView: View {
     }
 }
 
-/// A note in the log with its actions as a quiet icon row beneath — no
-/// menu to hunt for on a desktop.
+/// A note in the log; its actions sit beside the bubble on hover (Slack's
+/// message toolbar), so the log keeps its rhythm and nothing covers the text.
 struct NoteBubble: View {
     let message: String
     let highlighted: Bool
@@ -154,14 +154,13 @@ struct NoteBubble: View {
     @State private var hovering = false
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 2) {
+        HStack(alignment: .bottom, spacing: 6) {
             SelectableText(text: message)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .background(highlighted ? Theme.accent.opacity(0.18) : Theme.bubble, in: RoundedRectangle(cornerRadius: 14))
                 .frame(maxWidth: 460, alignment: .leading)
-            // Space is always reserved so hovering never shifts the log.
-            HStack(spacing: 2) {
+            HStack(spacing: 0) {
                 action("pencil", "Edit note", onEdit)
                 action("doc.on.doc", "Copy note") {
                     NSPasteboard.general.clearContents()
@@ -169,9 +168,9 @@ struct NoteBubble: View {
                 }
                 action("trash", "Delete note", onDelete)
             }
+            .padding(.bottom, 4)
             .opacity(hovering ? 1 : 0)
         }
-        .frame(maxWidth: 460, alignment: .trailing)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
@@ -180,12 +179,8 @@ struct NoteBubble: View {
     private func action(_ symbol: String, _ label: String, _ run: @escaping () -> Void) -> some View {
         Button(action: run) {
             Image(systemName: symbol)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Theme.muted)
-                .frame(width: 24, height: 20)
-                .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SidebarIconButtonStyle())
         .tooltip(label)
         .accessibilityLabel(label)
     }
