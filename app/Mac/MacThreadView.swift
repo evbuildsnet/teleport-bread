@@ -91,7 +91,8 @@ struct MacThreadView: View {
                 accessory: { editingAccessory },
                 sendSymbol: messageComposer.isEditing ? "checkmark" : "arrow.up",
                 canSend: !messageComposer.sanitizedDraft.isEmpty,
-                onSend: { messageComposer.send(to: live, via: model) }
+                onSend: { messageComposer.send(to: live, via: model) },
+                onCancel: messageComposer.isEditing ? { messageComposer.cancelEditing() } : nil
             )
         }
         .frame(maxWidth: Theme.columnMaxWidth)
@@ -187,7 +188,8 @@ struct NoteBubble: View {
 }
 
 /// Floating glass composer (T3 geometry: radius 22/20, send bottom-right).
-/// ⏎ sends, ⇧⏎ inserts a newline.
+/// ⏎ sends, ⇧⏎ inserts a newline, ⎋ runs `onCancel` when one is given
+/// (editing a note: discard the edit).
 struct Composer<Accessory: View, Footer: View>: View {
     @Binding var text: String
     let placeholder: String
@@ -197,6 +199,7 @@ struct Composer<Accessory: View, Footer: View>: View {
     var sendSymbol = "arrow.up"
     let canSend: Bool
     let onSend: () -> Void
+    var onCancel: (() -> Void)?
     @State private var editorHeight: CGFloat = 20
 
     init(
@@ -207,7 +210,8 @@ struct Composer<Accessory: View, Footer: View>: View {
         @ViewBuilder footer: () -> Footer = { EmptyView() },
         sendSymbol: String = "arrow.up",
         canSend: Bool,
-        onSend: @escaping () -> Void
+        onSend: @escaping () -> Void,
+        onCancel: (() -> Void)? = nil
     ) {
         _text = text
         self.placeholder = placeholder
@@ -217,6 +221,7 @@ struct Composer<Accessory: View, Footer: View>: View {
         self.sendSymbol = sendSymbol
         self.canSend = canSend
         self.onSend = onSend
+        self.onCancel = onCancel
     }
 
     var body: some View {
@@ -241,6 +246,11 @@ struct Composer<Accessory: View, Footer: View>: View {
                     .onKeyPress(.return, phases: .down) { press in
                         if press.modifiers.contains(.shift) { return .ignored }
                         if canSend { onSend() }
+                        return .handled
+                    }
+                    .onKeyPress(.escape) {
+                        guard let onCancel else { return .ignored }
+                        onCancel()
                         return .handled
                     }
                     .accessibilityLabel("Composer")
