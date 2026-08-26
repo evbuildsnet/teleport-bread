@@ -9,6 +9,11 @@ struct TooltipState: Equatable {
     var edge: VerticalEdge
 }
 
+/// Window-root coordinate space shared by every in-window floating layer.
+enum WindowSpace {
+    static let name = "window"
+}
+
 /// Styled tooltip for icon-only controls. The label is rendered by
 /// `TooltipLayer` at the window root, so it floats above every row and never
 /// gets covered or clipped by the control's own container. Sits above the
@@ -27,7 +32,7 @@ struct Tooltip: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(TooltipLayer.space)) } action: { frame in
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(WindowSpace.name)) } action: { frame in
                 anchor = frame
                 if shown { ui.tooltip?.anchor = frame }
             }
@@ -50,9 +55,8 @@ struct Tooltip: ViewModifier {
 }
 
 /// Draws the active tooltip. Mount once at the window root, together with
-/// `.coordinateSpace(name: TooltipLayer.space)` on the same view.
+/// `.coordinateSpace(name: WindowSpace.name)` on the same view.
 struct TooltipLayer: View {
-    static let space = "tooltipWindow"
     @Environment(UIState.self) private var ui
 
     var body: some View {

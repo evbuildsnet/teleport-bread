@@ -63,6 +63,20 @@ final class UIState {
     /// The one tooltip on screen, drawn by `TooltipLayer` at the window root.
     var tooltip: TooltipState?
 
+    /// Row snooze menu, drawn in-window by `SnoozeMenuLayer` beside its
+    /// button — no popover window to spin up, no animation. While open the
+    /// row stays hovered (the cursor leaves it to reach the menu).
+    struct SnoozeMenu: Equatable {
+        var id: String
+        var anchor: CGRect
+    }
+    var snoozeMenu: SnoozeMenu? {
+        didSet {
+            hoverLockID = snoozeMenu?.id
+            if snoozeMenu != nil { NSApp.keyWindow?.makeFirstResponder(nil) } else { hoveredID = nil }
+        }
+    }
+
     // MARK: Modes that change what keys mean
 
     /// A need title being edited inline — in its sidebar row or the top bar.

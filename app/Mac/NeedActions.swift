@@ -87,7 +87,7 @@ struct HoverActions: View {
     @Environment(UIState.self) private var ui
     let snapshot: ReminderSnapshot
     let placement: NeedState
-    @State private var snoozeOpen = false
+    @State private var snoozeAnchor = CGRect.zero
 
     var body: some View {
         let actions = NeedActions(model: model, ui: ui)
@@ -104,19 +104,15 @@ struct HoverActions: View {
     }
 
     private var snoozeButton: some View {
-        Button { snoozeOpen = true } label: { Image(systemName: "clock") }
-            .buttonStyle(SidebarIconButtonStyle())
-            .accessibilityLabel("Snooze need")
-            .tooltip("Snooze", suppressed: snoozeOpen)
-            .popover(isPresented: $snoozeOpen, arrowEdge: .trailing) {
-                SnoozePopover(snapshot: snapshot)
-            }
-            .onChange(of: snoozeOpen) { _, open in
-                // The cursor leaves the row to reach the popover; keep the
-                // row hovered (and this button mounted) until it closes.
-                ui.hoverLockID = open ? snapshot.id : nil
-                if !open { ui.hoveredID = nil }
-            }
+        Button {
+            ui.snoozeMenu = .init(id: snapshot.id, anchor: snoozeAnchor)
+        } label: {
+            Image(systemName: "clock")
+        }
+        .buttonStyle(SidebarIconButtonStyle())
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(WindowSpace.name)) } action: { snoozeAnchor = $0 }
+        .accessibilityLabel("Snooze need")
+        .tooltip("Snooze", suppressed: ui.snoozeMenu != nil)
     }
 
     private func iconButton(_ symbol: String, help: String, action: @escaping () -> Void) -> some View {
@@ -129,14 +125,51 @@ struct HoverActions: View {
     }
 }
 
-/// Presets + Pick date… (mobile's "Snooze until" dialog, as a popover).
-struct SnoozePopover: View {
+/// Presets + Pick date… (mobile's "Snooze until" dialog), drawn in-window
+/// beside the clock button. ↑↓ move, ⏎ picks, ⎋ closes; click outside closes.
+struct SnoozeMenuLayer: View {
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
-    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        if let menu = ui.snoozeMenu, let snapshot = model.snapshot(id: menu.id) {
+            GeometryReader { geometry in
+                ZStack(alignment: .topLeading) {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { ui.snoozeMenu = nil }
+                    SnoozeMenu(snapshot: snapshot) { ui.snoozeMenu = nil }
+                        .background(Theme.overlay, in: RoundedRectangle(cornerRadius: 10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.border))
+                        .shadow(color: .black.opacity(0.25), radius: 12, y: 4)
+                        // Beside the button, to the right; flipped left when
+                        // that would leave the window; kept inside vertically.
+                        .alignmentGuide(.leading) { d in
+                            let right = menu.anchor.maxX + 6
+                            let fits = right + d.width <= geometry.size.width - 8
+                            return -(fits ? right : max(8, menu.anchor.minX - 6 - d.width))
+                        }
+                        .alignmentGuide(.top) { d in
+                            let bottomMost = max(8, geometry.size.height - d.height - 8)
+                            return -min(max(8, menu.anchor.midY - d.height / 2), bottomMost)
+                        }
+                }
+            }
+        }
+    }
+}
+
+struct SnoozeMenu: View {
+    @Environment(AppModel.self) private var model
+    @Environment(UIState.self) private var ui
     let snapshot: ReminderSnapshot
+    let close: () -> Void
     @State private var picking = false
+    @State private var highlighted = 0
     @State private var date = Calendar.current.date(byAdding: .day, value: 1, to: .now)!
+    @FocusState private var focused: Bool
+
+    private let items = TriageAction.snoozeMenu
 
     var body: some View {
         let actions = NeedActions(model: model, ui: ui)
@@ -149,37 +182,49 @@ struct SnoozePopover: View {
             if picking {
                 CalendarPicker(date: $date) {
                     actions.snooze(snapshot, until: date)
-                    dismiss()
+                    close()
                 } cancel: { picking = false }
             } else {
-                ForEach(TriageAction.snoozeMenu) { action in
-                    if action == .snoozePickDate {
-                        Divider().padding(.vertical, 2)
-                        // Popovers can host the field inline; no panel needed.
-                        menuRow(action.label) { picking = true }
-                    } else {
-                        menuRow(action.label) {
-                            actions.perform(action, on: snapshot)
-                            dismiss()
-                        }
+                ForEach(Array(items.enumerated()), id: \.element) { index, action in
+                    if action == .snoozePickDate { Divider().padding(.vertical, 2) }
+                    Button {
+                        run(action, actions)
+                    } label: {
+                        Text(action.label)
+                            .font(.system(size: 13))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 8)
+                            .frame(height: 26)
+                            .contentShape(Rectangle())
                     }
+                    .buttonStyle(PaletteRowStyle(highlighted: highlighted == index))
                 }
             }
         }
         .padding(8)
         .frame(width: picking ? nil : 180)
+        .focusable()
+        .focusEffectDisabled()
+        .focused($focused)
+        .onKeyPress(.escape) { close(); return .handled }
+        .onKeyPress(.upArrow) { move(-1); return .handled }
+        .onKeyPress(.downArrow) { move(1); return .handled }
+        .onKeyPress(.return) { run(items[highlighted], actions); return .handled }
+        .task { focused = true }
+        .onChange(of: picking) { _, picking in if !picking { focused = true } }
     }
 
-    private func menuRow(_ title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 13))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 8)
-                .frame(height: 26)
-                .contentShape(Rectangle())
+    private func move(_ offset: Int) {
+        highlighted = (highlighted + offset + items.count) % items.count
+    }
+
+    private func run(_ action: TriageAction, _ actions: NeedActions) {
+        if action == .snoozePickDate {
+            picking = true
+        } else {
+            actions.perform(action, on: snapshot)
+            close()
         }
-        .buttonStyle(PaletteRowStyle())
     }
 }
 

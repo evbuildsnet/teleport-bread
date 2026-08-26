@@ -39,6 +39,9 @@ enum Snapshotter {
         await shoot("01-thread-dark")
         ui.snoozedExpanded = true
         await shoot("02-shelves-open")
+        ui.snoozeMenu = .init(id: model.inbox[1].id, anchor: CGRect(x: 226, y: 226, width: 26, height: 26))
+        await shoot("02b-snooze-menu")
+        ui.snoozeMenu = nil
         ui.paletteOpen = true
         await shoot("03-palette")
         ui.paletteQuery = "passport"

@@ -25,8 +25,9 @@ struct MainWindow: View {
         }
         .ignoresSafeArea()
         .overlay { if ui.paletteOpen { CommandPalette() } }
+        .overlay { SnoozeMenuLayer() }
         .overlay { TooltipLayer() }
-        .coordinateSpace(name: TooltipLayer.space)
+        .coordinateSpace(name: WindowSpace.name)
         .onChange(of: model.inbox.isEmpty, initial: true) { _, _ in
             guard ui.selection == nil, let first = model.inbox.first else { return }
             ui.selection = .need(first.id)
