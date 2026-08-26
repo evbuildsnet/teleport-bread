@@ -25,6 +25,12 @@ struct InboxView: View {
     @State private var pullArmed = false
     private let pullThreshold: CGFloat = 96
 
+    /// Swipe actions follow row height. Below ~66pt iOS 26 draws them as
+    /// wide icon+text capsules that eat half the row; from there on it
+    /// stacks a round icon over a small label (~⅓ of the row), and the icon
+    /// is only near-circular from ~74pt. 12pt padding → 74pt rows.
+    static let inboxRowPadding: CGFloat = 12
+
     private var drafts: [NeedDraft] { model.visibleDrafts }
     private var inbox: [ReminderSnapshot] { model.visibleInbox }
     private var snoozed: [ReminderSnapshot] { model.visibleSnoozed }
@@ -202,9 +208,7 @@ struct InboxView: View {
                 .lineLimit(2)
                 .foregroundStyle(compact ? .secondary : .primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                // Tight rows: swipe actions scale with row height, and a tall
-                // row made them dominate the screen.
-                .padding(.vertical, compact ? 0 : 2)
+                .padding(.vertical, compact ? 0 : Self.inboxRowPadding)
         }
         .listRowSeparator(.hidden, edges: .top)
         .listRowSeparator(compact || isLast ? .hidden : .visible, edges: .bottom)
