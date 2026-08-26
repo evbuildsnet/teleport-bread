@@ -1,15 +1,16 @@
 import InboxCore
 import SwiftUI
 
-/// 52pt bar: "List / Need title" breadcrumb. Title opens the action menu and
-/// supports inline rename (T3: title click → menu, inline rename).
+/// 52pt bar: "List / Need title" breadcrumb. Title opens the action menu;
+/// the pencil beside it (or Rename… in the menu) edits the title in place.
 struct TopBar: View {
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
     let snapshot: ReminderSnapshot?
-    @State private var renaming = false
-    @State private var renameText = ""
-    @FocusState private var renameFocused: Bool
+
+    private func editing(_ snapshot: ReminderSnapshot) -> Bool {
+        ui.titleEdit == .init(id: snapshot.id, place: .topBar)
+    }
 
     var body: some View {
         HStack(spacing: 8) {
@@ -24,17 +25,12 @@ struct TopBar: View {
                 .tooltip("Show sidebar ⌘B", edge: .bottom)
             }
             if let snapshot {
-                if renaming {
-                    TextField("Need title", text: $renameText)
-                        .textFieldStyle(.plain)
-                        .focused($renameFocused)
-                        .onSubmit(commitRename)
-                        .onKeyPress(.escape) { renaming = false; return .handled }
-                        .onChange(of: renameFocused) { _, focused in if !focused { commitRename() } }
+                if editing(snapshot) {
+                    TitleEditor(snapshot: snapshot, place: .topBar)
                         .frame(maxWidth: 480)
                 } else {
                     Menu {
-                        NeedActionMenu(snapshot: snapshot) { beginRename(snapshot) }
+                        NeedActionMenu(snapshot: snapshot) { beginEdit(snapshot) }
                     } label: {
                         Text(snapshot.title)
                             .lineLimit(1)
@@ -47,6 +43,14 @@ struct TopBar: View {
                     .accessibilityLabel("Need actions")
                     .accessibilityIdentifier("threadTitle")
                     .accessibilityValue(snapshot.title)
+                    Button {
+                        beginEdit(snapshot)
+                    } label: {
+                        Image(systemName: "pencil")
+                    }
+                    .buttonStyle(SidebarIconButtonStyle())
+                    .tooltip("Edit title", edge: .bottom)
+                    .accessibilityLabel("Edit title")
                 }
             }
             Spacer()
@@ -59,25 +63,7 @@ struct TopBar: View {
         .gesture(WindowDragGesture())
     }
 
-    private func beginRename(_ snapshot: ReminderSnapshot) {
-        renameText = snapshot.title
-        renaming = true
-        renameFocused = true
-    }
-
-    private func commitRename() {
-        guard renaming, let snapshot else { return }
-        renaming = false
-        let title = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !title.isEmpty, title != snapshot.title else { return }
-        Task {
-            // A failed write re-enters rename with the text intact rather
-            // than silently reverting the title.
-            if await !model.update(snapshot, title: title, listID: snapshot.listID), !renaming {
-                renameText = title
-                renaming = true
-                renameFocused = true
-            }
-        }
+    private func beginEdit(_ snapshot: ReminderSnapshot) {
+        ui.titleEdit = .init(id: snapshot.id, place: .topBar)
     }
 }

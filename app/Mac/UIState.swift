@@ -71,7 +71,11 @@ final class UIState {
         var id: String
         var place: Place
     }
-    var titleEdit: TitleEdit?
+    var titleEdit: TitleEdit? {
+        didSet { if titleEdit != nil { NSApp.keyWindow?.makeFirstResponder(nil) } }
+    }
+    /// Text handed back to the next editor after a failed save.
+    var titleEditRestore: String?
     /// Sidebar search field has keyboard focus.
     var searchFocused = false
     /// The thread composer is editing an existing note.

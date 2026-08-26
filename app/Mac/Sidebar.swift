@@ -234,36 +234,39 @@ struct NeedCard: View {
 
     private var isSelected: Bool { ui.selection == .need(snapshot.id) }
     private var hovering: Bool { ui.hoveredID == snapshot.id }
+    private var editing: Bool { ui.titleEdit == .init(id: snapshot.id, place: .sidebar) }
 
     var body: some View {
-        Text(snapshot.title)
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(Theme.sidebarText)
-            .lineLimit(2)
-            .multilineTextAlignment(.leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 10)
-            // Fixed height fitting the 2-line title cap: hover must never
-            // change a row's height (the list would jump under the cursor).
-            .frame(height: 54)
-            .background(rowBackground(isSelected: isSelected, hovering: hovering), in: RoundedRectangle(cornerRadius: Theme.radius))
-            // Actions float over the title instead of squeezing it (the
-            // row never changes height or reflows under the cursor).
-            .overlay(alignment: .trailing) {
-                if hovering {
-                    HoverActions(snapshot: snapshot, placement: .inbox)
-                        .padding(.trailing, 4)
+        // Fixed height fitting the 2-line title cap: hover must never
+        // change a row's height (the list would jump under the cursor).
+        if editing {
+            TitleEditor(snapshot: snapshot, place: .sidebar)
+                .font(.system(size: 13, weight: .medium))
+                .padding(.horizontal, 10)
+                .frame(height: 54)
+                .background(rowBackground(isSelected: isSelected, hovering: false), in: RoundedRectangle(cornerRadius: Theme.radius))
+        } else {
+            Text(snapshot.title)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Theme.sidebarText)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10)
+                .frame(height: 54)
+                .background(rowBackground(isSelected: isSelected, hovering: hovering), in: RoundedRectangle(cornerRadius: Theme.radius))
+                // Actions float over the title instead of squeezing it (the
+                // row never changes height or reflows under the cursor).
+                .overlay(alignment: .trailing) {
+                    if hovering {
+                        HoverActions(snapshot: snapshot, placement: .inbox)
+                            .padding(.trailing, 4)
+                    }
                 }
-            }
-            .zIndex(hovering ? 1 : 0)
-        .contentShape(Rectangle())
-        .onTapGesture { ui.open(.need(snapshot.id), model: model) }
-        .onHover { ui.setHover(snapshot.id, $0) }
-        .contextMenu { NeedActionMenu(snapshot: snapshot) }
-        .overlay(alignment: .trailing) { JumpBadge(number: number) }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(snapshot.title)
-        .accessibilityAddTraits(.isButton)
+                .zIndex(hovering ? 1 : 0)
+                .modifier(RowInteraction(snapshot: snapshot))
+                .overlay(alignment: .trailing) { JumpBadge(number: number) }
+        }
     }
 }
 
@@ -278,30 +281,52 @@ struct NeedRow: View {
 
     private var isSelected: Bool { ui.selection == .need(snapshot.id) }
     private var hovering: Bool { ui.hoveredID == snapshot.id }
+    private var editing: Bool { ui.titleEdit == .init(id: snapshot.id, place: .sidebar) }
 
     var body: some View {
-        Text(snapshot.title)
-            .font(.system(size: 13))
-            .foregroundStyle(Theme.sidebarMuted)
-            .lineLimit(1)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 10)
-            .frame(height: Theme.rowHeight)
-            .background(rowBackground(isSelected: isSelected, hovering: hovering), in: RoundedRectangle(cornerRadius: Theme.controlRadius))
-            .overlay(alignment: .trailing) {
-                if hovering {
-                    HoverActions(snapshot: snapshot, placement: placement == .snoozed ? .snoozed : .settled)
-                        .padding(.trailing, 4)
+        if editing {
+            TitleEditor(snapshot: snapshot, place: .sidebar)
+                .font(.system(size: 13))
+                .padding(.horizontal, 10)
+                .frame(height: Theme.rowHeight)
+                .background(rowBackground(isSelected: isSelected, hovering: false), in: RoundedRectangle(cornerRadius: Theme.controlRadius))
+        } else {
+            Text(snapshot.title)
+                .font(.system(size: 13))
+                .foregroundStyle(Theme.sidebarMuted)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10)
+                .frame(height: Theme.rowHeight)
+                .background(rowBackground(isSelected: isSelected, hovering: hovering), in: RoundedRectangle(cornerRadius: Theme.controlRadius))
+                .overlay(alignment: .trailing) {
+                    if hovering {
+                        HoverActions(snapshot: snapshot, placement: placement == .snoozed ? .snoozed : .settled)
+                            .padding(.trailing, 4)
+                    }
                 }
-            }
-            .zIndex(hovering ? 1 : 0)
-        .contentShape(Rectangle())
-        .onTapGesture { ui.open(.need(snapshot.id), model: model) }
-        .onHover { ui.setHover(snapshot.id, $0) }
-        .contextMenu { NeedActionMenu(snapshot: snapshot) }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(snapshot.title)
-        .accessibilityAddTraits(.isButton)
+                .zIndex(hovering ? 1 : 0)
+                .modifier(RowInteraction(snapshot: snapshot))
+        }
+    }
+}
+
+/// Click opens, double-click edits the title in place, right-click menus.
+private struct RowInteraction: ViewModifier {
+    @Environment(AppModel.self) private var model
+    @Environment(UIState.self) private var ui
+    let snapshot: ReminderSnapshot
+
+    func body(content: Content) -> some View {
+        content
+            .contentShape(Rectangle())
+            .onTapGesture(count: 2) { ui.titleEdit = .init(id: snapshot.id, place: .sidebar) }
+            .onTapGesture { ui.open(.need(snapshot.id), model: model) }
+            .onHover { ui.setHover(snapshot.id, $0) }
+            .contextMenu { NeedActionMenu(snapshot: snapshot) { ui.titleEdit = .init(id: snapshot.id, place: .sidebar) } }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(snapshot.title)
+            .accessibilityAddTraits(.isButton)
     }
 }
 
