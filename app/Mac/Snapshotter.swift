@@ -11,7 +11,6 @@ enum Snapshotter {
     }
 
     static func run(model: AppModel, ui: UIState) async {
-        FileHandle.standardError.write(Data("snapshotter: env keys \(ProcessInfo.processInfo.environment.keys.filter { $0.hasPrefix("INBOXZERO") })\n".utf8))
         guard let directory else { return }
         FileHandle.standardError.write(Data("snapshotter: start → \(directory.path)\n".utf8))
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
