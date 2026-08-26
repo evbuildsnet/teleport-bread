@@ -331,8 +331,16 @@ private struct RowInteraction: ViewModifier {
     func body(content: Content) -> some View {
         content
             .contentShape(Rectangle())
-            .onTapGesture(count: 2) { ui.titleEdit = .init(id: snapshot.id, place: .sidebar) }
-            .onTapGesture { ui.open(.need(snapshot.id), model: model) }
+            // Double-click via AppKit's click count, not a count-2 gesture:
+            // that would hold every single click on the row — hover buttons
+            // included — for the double-click interval before firing.
+            .onTapGesture {
+                if NSApp.currentEvent?.clickCount == 2 {
+                    ui.titleEdit = .init(id: snapshot.id, place: .sidebar)
+                } else {
+                    ui.open(.need(snapshot.id), model: model)
+                }
+            }
             .onHover { ui.setHover(snapshot.id, $0) }
             .contextMenu { NeedActionMenu(snapshot: snapshot) { ui.titleEdit = .init(id: snapshot.id, place: .sidebar) } }
             .accessibilityElement(children: .combine)
