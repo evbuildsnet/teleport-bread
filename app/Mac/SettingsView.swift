@@ -1,4 +1,5 @@
 import AppKit
+import Carbon.HIToolbox
 import ServiceManagement
 import SwiftUI
 
@@ -13,13 +14,17 @@ struct SettingsView: View {
             Section("Quick capture") {
                 LabeledContent("Global shortcut") {
                     HStack(spacing: 8) {
-                        ShortcutRecorder(combo: hotKeys.combo, placeholder: "Record shortcut") { hotKeys.combo = $0 }
-                        if hotKeys.combo != nil {
-                            Button("Clear") { hotKeys.combo = nil }
+                        ShortcutRecorder(combo: hotKeys.combo, placeholder: "None", onClear: { hotKeys.combo = nil }) { hotKeys.combo = $0 }
+                        Button {
+                            hotKeys.combo = nil
+                        } label: {
+                            Image(systemName: "xmark")
                         }
+                        .help("Unbind — no global shortcut")
+                        .disabled(hotKeys.combo == nil)
                     }
                 }
-                Text("Opens a single-field capture box over any app. Needs at least one of ⌘ ⌃ ⌥.")
+                Text("Opens a single-field capture box over any app. Needs at least one of ⌘ ⌃ ⌥; × (or ⌫ while recording) unbinds it.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -73,11 +78,13 @@ struct SettingsView: View {
     }
 }
 
-/// Click, press a combination, done. ⎋ cancels. Only one recorder listens
-/// at a time (each installs its own monitor while recording).
+/// Click, press a combination, done. ⎋ cancels; ⌫ clears when `onClear` is
+/// given. Only one recorder listens at a time (each installs its own monitor
+/// while recording).
 struct ShortcutRecorder: View {
     let combo: KeyCombo?
     let placeholder: String
+    var onClear: (() -> Void)?
     let onRecord: (KeyCombo) -> Void
     @State private var recording = false
     @State private var monitor: Any?
@@ -95,10 +102,12 @@ struct ShortcutRecorder: View {
     private func start() {
         recording = true
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            let isEscape = event.keyCode == 53
+            let isEscape = event.keyCode == kVK_Escape
+            let isDelete = event.keyCode == kVK_Delete || event.keyCode == kVK_ForwardDelete
             let combo = KeyCombo(event: event)
             MainActor.assumeIsolated {
                 if isEscape { stop(); return }
+                if isDelete, let onClear { stop(); onClear(); return }
                 guard let combo else { return }
                 stop()
                 onRecord(combo)
