@@ -134,6 +134,7 @@ struct SnoozeMenuLayer: View {
     var body: some View {
         if let menu = ui.snoozeMenu, let snapshot = model.snapshot(id: menu.id) {
             GeometryReader { geometry in
+                let size = geometry.size
                 ZStack(alignment: .topLeading) {
                     Color.clear
                         .contentShape(Rectangle())
@@ -146,11 +147,11 @@ struct SnoozeMenuLayer: View {
                         // that would leave the window; kept inside vertically.
                         .alignmentGuide(.leading) { d in
                             let right = menu.anchor.maxX + 6
-                            let fits = right + d.width <= geometry.size.width - 8
+                            let fits = right + d.width <= size.width - 8
                             return -(fits ? right : max(8, menu.anchor.minX - 6 - d.width))
                         }
                         .alignmentGuide(.top) { d in
-                            let bottomMost = max(8, geometry.size.height - d.height - 8)
+                            let bottomMost = max(8, size.height - d.height - 8)
                             return -min(max(8, menu.anchor.midY - d.height / 2), bottomMost)
                         }
                 }
