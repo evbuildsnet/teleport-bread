@@ -158,11 +158,12 @@ struct NoteBubble: View {
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 6) {
-            SelectableText(text: message)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(highlighted ? Theme.accent.opacity(0.18) : Theme.bubble, in: RoundedRectangle(cornerRadius: 14))
-                .frame(maxWidth: 460, alignment: .leading)
+            HugWidth(maxWidth: 460) {
+                SelectableText(text: message)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(highlighted ? Theme.accent.opacity(0.18) : Theme.bubble, in: RoundedRectangle(cornerRadius: 14))
+            }
             HStack(spacing: 0) {
                 action("pencil", "Edit note", onEdit)
                 action("doc.on.doc", "Copy note") {
@@ -186,6 +187,23 @@ struct NoteBubble: View {
         .buttonStyle(SidebarIconButtonStyle())
         .tooltip(label)
         .accessibilityLabel(label)
+    }
+}
+
+/// One child, as wide as its ideal size and no wider than `maxWidth`: a
+/// bubble that fits its text instead of always spanning the cap.
+private struct HugWidth: Layout {
+    let maxWidth: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let child = subviews.first else { return .zero }
+        let cap = min(proposal.width ?? maxWidth, maxWidth)
+        let ideal = child.sizeThatFits(.unspecified)
+        return ideal.width <= cap ? ideal : child.sizeThatFits(ProposedViewSize(width: cap, height: nil))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, anchor: .topLeading, proposal: ProposedViewSize(bounds.size))
     }
 }
 
