@@ -6,6 +6,7 @@ import SwiftUI
 struct Sidebar: View {
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
+    @Environment(\.openSettings) private var openSettings
     @FocusState private var searchFocused: Bool
 
     private var drafts: [NeedDraft] {
@@ -65,18 +66,27 @@ struct Sidebar: View {
     private var header: some View {
         @Bindable var model = model
         return VStack(spacing: 8) {
-            HStack(spacing: 8) {
+            HStack(spacing: 2) {
                 Spacer().frame(width: 70) // traffic lights
+                Text("InboxZero")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.sidebarText)
+                    .padding(.trailing, 6)
                 Button {
-                    withAnimation(.snappy(duration: 0.2)) { ui.sidebarVisible.toggle() }
+                    ui.perform(.action(.toggleSidebar), model: model)
                 } label: {
                     Image(systemName: "sidebar.left")
                 }
                 .buttonStyle(SidebarIconButtonStyle())
                 .tooltip("Hide sidebar \(Shortcuts.shared.display(.toggleSidebar))", edge: .bottom)
-                Text("InboxZero")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.sidebarText)
+                Button {
+                    openSettings()
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .buttonStyle(SidebarIconButtonStyle())
+                .tooltip("Settings ⌘,", edge: .bottom)
+                .accessibilityLabel("Settings")
                 Spacer()
             }
             .frame(height: Theme.topBarHeight)
