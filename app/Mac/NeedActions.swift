@@ -147,7 +147,7 @@ struct SnoozePopover: View {
                 .padding(.horizontal, 8)
                 .padding(.bottom, 4)
             if picking {
-                SnoozeDateField(date: $date) {
+                CalendarPicker(date: $date) {
                     actions.snooze(snapshot, until: date)
                     dismiss()
                 } cancel: { picking = false }
@@ -167,7 +167,7 @@ struct SnoozePopover: View {
             }
         }
         .padding(8)
-        .frame(width: picking ? 240 : 180)
+        .frame(width: picking ? nil : 180)
     }
 
     private func menuRow(_ title: String, action: @escaping () -> Void) -> some View {
@@ -197,10 +197,11 @@ enum SnoozeDatePicker {
         panel.titlebarAppearsTransparent = true
         panel.isFloatingPanel = true
         panel.isReleasedWhenClosed = false
-        panel.contentView = NSHostingView(
+        let hosting = NSHostingView(
             rootView: SnoozePanelBody(snapshot: snapshot) { panel.close() }.environment(model).environment(ui)
         )
-        panel.setContentSize(NSSize(width: 260, height: 110))
+        panel.contentView = hosting
+        panel.setContentSize(hosting.fittingSize)
         panel.center()
         panel.makeKeyAndOrderFront(nil)
     }
@@ -219,14 +220,14 @@ private struct SnoozePanelBody: View {
                 .font(.system(size: 12))
                 .foregroundStyle(Theme.muted)
                 .lineLimit(1)
-            SnoozeDateField(date: $date) {
+            CalendarPicker(date: $date) {
                 NeedActions(model: model, ui: ui).snooze(snapshot, until: date)
                 close()
             } cancel: { close() }
         }
         .padding(12)
         .padding(.top, 16)
-        .frame(width: 260)
+        .background(Theme.overlay)
     }
 }
 
@@ -241,36 +242,5 @@ struct PaletteRowStyle: ButtonStyle {
                 in: RoundedRectangle(cornerRadius: 6)
             )
             .onHover { hovering = $0 }
-    }
-}
-
-/// Desktop date entry: a segmented field, pre-filled with tomorrow. ← → move
-/// between day/month/year, ↑ ↓ step, ⏎ snoozes. No calendar grid.
-struct SnoozeDateField: View {
-    @Binding var date: Date
-    let confirm: () -> Void
-    let cancel: () -> Void
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            DatePicker("Snooze until", selection: $date, in: Date.now..., displayedComponents: .date)
-                .datePickerStyle(.field)
-                .labelsHidden()
-                .focused($focused)
-                .onSubmit(confirm)
-            Text("↑↓ change · ←→ next part · ⏎ snooze")
-                .font(.system(size: 11))
-                .foregroundStyle(Theme.muted)
-            HStack {
-                Spacer()
-                Button("Cancel", action: cancel).keyboardShortcut(.cancelAction)
-                Button("Snooze", action: confirm).keyboardShortcut(.defaultAction)
-            }
-        }
-        .task {
-            try? await Task.sleep(for: .milliseconds(80))
-            focused = true
-        }
     }
 }
