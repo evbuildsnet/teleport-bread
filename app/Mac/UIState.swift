@@ -81,10 +81,41 @@ final class UIState {
     /// The thread composer is editing an existing note.
     var noteEditing = false
 
-    /// ⌘1…⌘9 jump only from a neutral state: never while searching or editing
-    /// (a draft is fine — its text is stashed when you leave).
-    func canJump(in model: AppModel) -> Bool {
-        !model.isSearching && !searchFocused && titleEdit == nil && !noteEditing
+    /// The main window, so key events from Settings are never dispatched.
+    weak var window: NSWindow?
+
+    /// What the keyboard is currently "in". SwiftUI focus state plus AppKit's
+    /// own view of it: a single-line field holding the field editor that is
+    /// not the title editor or the palette can only be the search field.
+    func keyContext(in model: AppModel) -> KeyContext {
+        var context: KeyContext = []
+        if paletteOpen { context.insert(.palette) }
+        if titleEdit != nil { context.insert(.titleEdit) }
+        if noteEditing { context.insert(.noteEdit) }
+        if model.isSearching || searchFocused || (context.isEmpty && textFieldFocused) { context.insert(.search) }
+        return context
+    }
+
+    private var textFieldFocused: Bool {
+        (window?.firstResponder as? NSTextView)?.delegate is NSTextField
+    }
+
+    func isAvailable(_ command: KeyCommand, in model: AppModel) -> Bool {
+        KeyBindings.binding(for: command, Shortcuts.shared).blockedIn.isDisjoint(with: keyContext(in: model))
+    }
+
+    /// Every command runs through here — from a key or a menu click — so the
+    /// context rules apply to both.
+    func perform(_ command: KeyCommand, model: AppModel) {
+        guard isAvailable(command, in: model) else { return }
+        switch command {
+        case .action(.newNeed): newDraft(model: model)
+        case .action(.palette): paletteOpen.toggle()
+        case .action(.previousNeed): selectNeighbor(-1, in: model)
+        case .action(.nextNeed): selectNeighbor(1, in: model)
+        case .action(.toggleSidebar): withAnimation(.snappy(duration: 0.2)) { sidebarVisible.toggle() }
+        case .jump(let number): jump(to: number, in: model)
+        }
     }
 
     func setHover(_ id: String, _ inside: Bool) {
@@ -131,7 +162,6 @@ final class UIState {
 
     /// ⌘1…⌘9 index today's needs only (the inbox), never the shelves.
     func jump(to number: Int, in model: AppModel) {
-        guard canJump(in: model) else { return }
         let rows = model.inbox
         guard rows.indices.contains(number - 1) else { return }
         open(.need(rows[number - 1].id), model: model)

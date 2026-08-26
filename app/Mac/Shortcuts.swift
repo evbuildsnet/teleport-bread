@@ -19,6 +19,14 @@ enum ShortcutAction: String, CaseIterable, Codable {
         }
     }
 
+    /// Where the key is inert. Technical, not a setting.
+    var blockedIn: KeyContext {
+        switch self {
+        case .newNeed, .previousNeed, .nextNeed: .palette
+        case .palette, .toggleSidebar: []
+        }
+    }
+
     var defaultCombo: KeyCombo {
         switch self {
         case .newNeed: KeyCombo(keyCode: kVK_ANSI_N, modifiers: .command)

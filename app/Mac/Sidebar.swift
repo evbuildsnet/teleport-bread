@@ -219,7 +219,7 @@ struct Sidebar: View {
 
     /// 1-based jump number among today's needs, first nine only.
     private func number(of item: ReminderSnapshot) -> Int? {
-        guard ui.commandHeld, ui.canJump(in: model) else { return nil }
+        guard ui.commandHeld, ui.isAvailable(.jump(1), in: model) else { return nil }
         guard let index = inbox.firstIndex(where: { $0.id == item.id }), index < 9 else { return nil }
         return index + 1
     }

@@ -18,37 +18,34 @@ struct InboxZeroMacApp: App {
         .defaultSize(width: 1100, height: 780)
         Settings { SettingsView() }
         .commands {
-            // T3 Code's shortcut set by default; keys come from Settings.
+            // Keys are dispatched by KeyBindings (context-aware) before the
+            // menu sees them; the menu shows the combos and runs the same
+            // commands on click.
             CommandGroup(replacing: .newItem) {
-                Button("New Need") { ui.newDraft(model: model) }
-                    .keyboardShortcut(shortcuts.combo(for: .newNeed).keyboardShortcut)
+                menuItem("New Need", .action(.newNeed))
                     .disabled(model.phase != .ready)
                 Button("Quick Capture") { CapturePanelController.shared.toggle(model: model) }
                     .disabled(model.phase != .ready)
             }
             CommandMenu("Go") {
-                Button("Command Palette") { ui.paletteOpen.toggle() }
-                    .keyboardShortcut(shortcuts.combo(for: .palette).keyboardShortcut)
+                menuItem("Command Palette", .action(.palette))
                 Divider()
-                Button("Previous Need") { ui.selectNeighbor(-1, in: model) }
-                    .keyboardShortcut(shortcuts.combo(for: .previousNeed).keyboardShortcut)
-                Button("Next Need") { ui.selectNeighbor(1, in: model) }
-                    .keyboardShortcut(shortcuts.combo(for: .nextNeed).keyboardShortcut)
+                menuItem("Previous Need", .action(.previousNeed))
+                menuItem("Next Need", .action(.nextNeed))
                 Divider()
-                // Fixed on purpose: the number is the badge on the row.
                 ForEach(1...9, id: \.self) { number in
-                    Button("Need \(number)") { ui.jump(to: number, in: model) }
-                        .keyboardShortcut(KeyEquivalent(Character(String(number))), modifiers: .command)
-                        .disabled(!ui.canJump(in: model))
+                    menuItem("Need \(number)", .jump(number))
                 }
             }
             CommandGroup(before: .sidebar) {
-                Button(ui.sidebarVisible ? "Hide Sidebar" : "Show Sidebar") {
-                    withAnimation(.snappy(duration: 0.2)) { ui.sidebarVisible.toggle() }
-                }
-                .keyboardShortcut(shortcuts.combo(for: .toggleSidebar).keyboardShortcut)
+                menuItem(ui.sidebarVisible ? "Hide Sidebar" : "Show Sidebar", .action(.toggleSidebar))
             }
         }
+    }
+
+    private func menuItem(_ title: String, _ command: KeyCommand) -> some View {
+        Button(title) { ui.perform(command, model: model) }
+            .keyboardShortcut(KeyBindings.binding(for: command, shortcuts).combo.keyboardShortcut)
     }
 }
 
@@ -87,10 +84,12 @@ struct MacRootView: View {
             if ui.commandHeld != command { ui.commandHeld = command }
         }
         .task { HotKeyCenter.shared.onPress = { CapturePanelController.shared.toggle(model: model) } }
+        .background(WindowReader { window in if ui.window !== window { ui.window = window } })
         .task { await Snapshotter.run(model: model, ui: ui) }
     }
 
-    /// ⌘-held badges and "type anywhere to focus the composer" (T3 behaviour):
+    /// One monitor: ⌘-held badges, key bindings (context-aware, ahead of the
+    /// menu bar), and "type anywhere to focus the composer" (T3 behaviour):
     /// an unmodified printable key outside any text control seeds the composer.
     private func installKeyMonitors() {
         guard !ui.monitorsInstalled else { return }
@@ -116,7 +115,9 @@ struct MacRootView: View {
                 let command = flags.contains(.command)
                 // Write only on change: every write re-renders observers.
                 if ui.commandHeld != command { ui.commandHeld = command }
-                guard !isFlagsChange, model.phase == .ready, !ui.paletteOpen,
+                guard !isFlagsChange, model.phase == .ready else { return false }
+                if event.window === ui.window, KeyBindings.handle(event, ui: ui, model: model) { return true }
+                guard !ui.paletteOpen,
                       flags.intersection([.command, .control, .option]).isEmpty,
                       let characters, characters.count == 1,
                       let scalar = characters.unicodeScalars.first,
