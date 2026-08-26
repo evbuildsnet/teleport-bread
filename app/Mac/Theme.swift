@@ -17,9 +17,10 @@ enum Theme {
 
     static let sidebar = dynamic(light: 0xFAFAFA, dark: 0x000000)
     static let sidebarText = dynamic(light: 0x27272A, dark: 0xF1F3F7)
-    static let sidebarMuted = dynamic(light: 0x71717B, dark: 0xA3A3A3)
-    static let sidebarHover = dynamic(light: 0xF1F1F3, dark: 0x131313)
-    static let sidebarSelected = dynamic(light: 0xFFFFFF, dark: 0x1A1B1B)
+    static let sidebarMuted = dynamic(light: 0x65656D, dark: 0xA3A3A3)
+    static let sidebarHover = dynamic(light: 0xEFEFF2, dark: 0x131313)
+    // Light: a clear step below the sidebar (white on #FAFAFA was invisible).
+    static let sidebarSelected = dynamic(light: 0xE3E3E8, dark: 0x1A1B1B)
     static let sidebarBorder = dynamic(light: 0xE4E4E7, dark: 0x141414)
 
     static let sidebarDefaultWidth: CGFloat = 256
