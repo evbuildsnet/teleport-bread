@@ -60,6 +60,28 @@ final class UIState {
     /// While a row's popover is open the cursor leaves the row; keep its
     /// hover (and the button the popover hangs off) alive until it closes.
     var hoverLockID: String?
+    /// The one tooltip on screen, drawn by `TooltipLayer` at the window root.
+    var tooltip: TooltipState?
+
+    // MARK: Modes that change what keys mean
+
+    /// A need title being edited inline — in its sidebar row or the top bar.
+    struct TitleEdit: Equatable {
+        enum Place { case sidebar, topBar }
+        var id: String
+        var place: Place
+    }
+    var titleEdit: TitleEdit?
+    /// Sidebar search field has keyboard focus.
+    var searchFocused = false
+    /// The thread composer is editing an existing note.
+    var noteEditing = false
+
+    /// ⌘1…⌘9 jump only from a neutral state: never while searching or editing
+    /// (a draft is fine — its text is stashed when you leave).
+    func canJump(in model: AppModel) -> Bool {
+        !model.isSearching && !searchFocused && titleEdit == nil && !noteEditing
+    }
 
     func setHover(_ id: String, _ inside: Bool) {
         if inside { hoveredID = id } else if hoveredID == id, hoverLockID != id { hoveredID = nil }
@@ -105,7 +127,8 @@ final class UIState {
 
     /// ⌘1…⌘9 index today's needs only (the inbox), never the shelves.
     func jump(to number: Int, in model: AppModel) {
-        let rows = model.visibleInbox
+        guard canJump(in: model) else { return }
+        let rows = model.inbox
         guard rows.indices.contains(number - 1) else { return }
         open(.need(rows[number - 1].id), model: model)
     }

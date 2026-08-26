@@ -25,6 +25,8 @@ struct MainWindow: View {
         }
         .ignoresSafeArea()
         .overlay { if ui.paletteOpen { CommandPalette() } }
+        .overlay { TooltipLayer() }
+        .coordinateSpace(name: TooltipLayer.space)
         .onChange(of: model.inbox.isEmpty, initial: true) { _, _ in
             guard ui.selection == nil, let first = model.inbox.first else { return }
             ui.selection = .need(first.id)

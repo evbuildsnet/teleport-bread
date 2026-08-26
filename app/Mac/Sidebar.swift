@@ -41,7 +41,7 @@ struct Sidebar: View {
                         }
                     }
                     .padding(.horizontal, 8)
-                    .padding(.top, 18) // room for a tooltip above the first row
+                    .padding(.top, 6)
                     .padding(.bottom, 6)
                 }
                 .onChange(of: ui.selection) { _, selection in
