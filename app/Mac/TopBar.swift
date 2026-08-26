@@ -22,7 +22,7 @@ struct TopBar: View {
                     Image(systemName: "sidebar.left")
                 }
                 .buttonStyle(SidebarIconButtonStyle())
-                .tooltip("Show sidebar ⌘B", edge: .bottom)
+                .tooltip("Show sidebar \(Shortcuts.shared.display(.toggleSidebar))", edge: .bottom)
             }
             if let snapshot {
                 if editing(snapshot) {

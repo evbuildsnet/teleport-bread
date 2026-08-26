@@ -6,6 +6,7 @@ import SwiftUI
 struct InboxZeroMacApp: App {
     @State private var model = ProcessInfo.processInfo.environment["INBOXZERO_PREVIEW"] == nil ? AppModel() : AppModel.preview()
     @State private var ui = UIState()
+    @State private var shortcuts = Shortcuts.shared
 
     var body: some Scene {
         WindowGroup("InboxZero") {
@@ -17,33 +18,35 @@ struct InboxZeroMacApp: App {
         .defaultSize(width: 1100, height: 780)
         Settings { SettingsView() }
         .commands {
-            // T3 Code's shortcut set — nothing invented.
+            // T3 Code's shortcut set by default; keys come from Settings.
             CommandGroup(replacing: .newItem) {
                 Button("New Need") { ui.newDraft(model: model) }
-                    .keyboardShortcut("n", modifiers: .command)
+                    .keyboardShortcut(shortcuts.combo(for: .newNeed).keyboardShortcut)
                     .disabled(model.phase != .ready)
                 Button("Quick Capture") { CapturePanelController.shared.toggle(model: model) }
                     .disabled(model.phase != .ready)
             }
             CommandMenu("Go") {
                 Button("Command Palette") { ui.paletteOpen.toggle() }
-                    .keyboardShortcut("k", modifiers: .command)
+                    .keyboardShortcut(shortcuts.combo(for: .palette).keyboardShortcut)
                 Divider()
                 Button("Previous Need") { ui.selectNeighbor(-1, in: model) }
-                    .keyboardShortcut("[", modifiers: [.command, .shift])
+                    .keyboardShortcut(shortcuts.combo(for: .previousNeed).keyboardShortcut)
                 Button("Next Need") { ui.selectNeighbor(1, in: model) }
-                    .keyboardShortcut("]", modifiers: [.command, .shift])
+                    .keyboardShortcut(shortcuts.combo(for: .nextNeed).keyboardShortcut)
                 Divider()
+                // Fixed on purpose: the number is the badge on the row.
                 ForEach(1...9, id: \.self) { number in
                     Button("Need \(number)") { ui.jump(to: number, in: model) }
                         .keyboardShortcut(KeyEquivalent(Character(String(number))), modifiers: .command)
+                        .disabled(!ui.canJump(in: model))
                 }
             }
             CommandGroup(before: .sidebar) {
                 Button(ui.sidebarVisible ? "Hide Sidebar" : "Show Sidebar") {
                     withAnimation(.snappy(duration: 0.2)) { ui.sidebarVisible.toggle() }
                 }
-                .keyboardShortcut("b", modifiers: .command)
+                .keyboardShortcut(shortcuts.combo(for: .toggleSidebar).keyboardShortcut)
             }
         }
     }

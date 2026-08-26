@@ -78,7 +78,7 @@ struct MainPane: View {
         case .draft(let id):
             DraftHero().id(id)
         case nil:
-            empty(model.inbox.isEmpty ? "Inbox Zero. Nothing due." : "Select a need, or press ⌘N.")
+            empty(model.inbox.isEmpty ? "Inbox Zero. Nothing due." : "Select a need, or press \(Shortcuts.shared.display(.newNeed)).")
         }
     }
 

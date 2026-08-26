@@ -72,7 +72,7 @@ struct Sidebar: View {
                     Image(systemName: "sidebar.left")
                 }
                 .buttonStyle(SidebarIconButtonStyle())
-                .tooltip("Hide sidebar ⌘B", edge: .bottom)
+                .tooltip("Hide sidebar \(Shortcuts.shared.display(.toggleSidebar))", edge: .bottom)
                 Text("InboxZero")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.sidebarText)
@@ -106,7 +106,7 @@ struct Sidebar: View {
                     Image(systemName: "square.and.pencil")
                 }
                 .buttonStyle(SidebarIconButtonStyle())
-                .tooltip("New need ⌘N", edge: .bottom)
+                .tooltip("New need \(Shortcuts.shared.display(.newNeed))", edge: .bottom)
                 .accessibilityLabel("New need")
             }
             .padding(.horizontal, 10)

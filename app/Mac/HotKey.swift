@@ -2,23 +2,52 @@ import AppKit
 import Carbon.HIToolbox
 import Foundation
 import Observation
+import SwiftUI
 
 /// A recorded key combination. Stored as keyCode + Carbon modifier mask.
-struct KeyCombo: Codable, Equatable {
+struct KeyCombo: Codable, Hashable {
     var keyCode: UInt32
     var carbonModifiers: UInt32
 
     init?(event: NSEvent) {
         let flags = event.modifierFlags.intersection([.command, .control, .option, .shift])
-        // A bare key would swallow normal typing system-wide; require a modifier.
+        // A bare key would swallow normal typing; require a real modifier.
         guard !flags.intersection([.command, .control, .option]).isEmpty else { return nil }
-        keyCode = UInt32(event.keyCode)
+        self.init(keyCode: Int(event.keyCode), modifiers: flags)
+    }
+
+    init(keyCode: Int, modifiers: NSEvent.ModifierFlags) {
+        self.keyCode = UInt32(keyCode)
         var mods: UInt32 = 0
-        if flags.contains(.command) { mods |= UInt32(cmdKey) }
-        if flags.contains(.control) { mods |= UInt32(controlKey) }
-        if flags.contains(.option) { mods |= UInt32(optionKey) }
-        if flags.contains(.shift) { mods |= UInt32(shiftKey) }
+        if modifiers.contains(.command) { mods |= UInt32(cmdKey) }
+        if modifiers.contains(.control) { mods |= UInt32(controlKey) }
+        if modifiers.contains(.option) { mods |= UInt32(optionKey) }
+        if modifiers.contains(.shift) { mods |= UInt32(shiftKey) }
         carbonModifiers = mods
+    }
+
+    /// The same combo as a SwiftUI menu shortcut; nil for keys SwiftUI has
+    /// no equivalent for (function keys and the like).
+    var keyboardShortcut: KeyboardShortcut? {
+        guard let key = keyEquivalent else { return nil }
+        var modifiers: SwiftUI.EventModifiers = []
+        if carbonModifiers & UInt32(cmdKey) != 0 { modifiers.insert(.command) }
+        if carbonModifiers & UInt32(controlKey) != 0 { modifiers.insert(.control) }
+        if carbonModifiers & UInt32(optionKey) != 0 { modifiers.insert(.option) }
+        if carbonModifiers & UInt32(shiftKey) != 0 { modifiers.insert(.shift) }
+        return KeyboardShortcut(key, modifiers: modifiers)
+    }
+
+    private var keyEquivalent: KeyEquivalent? {
+        let special: [UInt32: KeyEquivalent] = [
+            UInt32(kVK_Space): .space, UInt32(kVK_Return): .return, UInt32(kVK_Tab): .tab,
+            UInt32(kVK_Escape): .escape, UInt32(kVK_Delete): .delete, UInt32(kVK_UpArrow): .upArrow,
+            UInt32(kVK_DownArrow): .downArrow, UInt32(kVK_LeftArrow): .leftArrow, UInt32(kVK_RightArrow): .rightArrow,
+        ]
+        if let key = special[keyCode] { return key }
+        let name = Self.keyName(keyCode).lowercased()
+        guard name.count == 1, let character = name.first else { return nil }
+        return KeyEquivalent(character)
     }
 
     var display: String {
