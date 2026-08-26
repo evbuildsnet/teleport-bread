@@ -32,6 +32,8 @@ struct MacThreadView: View {
             try? await Task.sleep(for: .milliseconds(60))
             composerFocused = true
         }
+        .onChange(of: messageComposer.isEditing, initial: true) { _, editing in ui.noteEditing = editing }
+        .onDisappear { ui.noteEditing = false }
     }
 
     // MARK: Log

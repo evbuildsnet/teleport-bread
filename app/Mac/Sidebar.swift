@@ -54,6 +54,7 @@ struct Sidebar: View {
                 .onChange(of: ui.snoozedExpanded || ui.settledExpanded) { _, _ in ui.hoveredID = nil }
             }
         }
+        .onChange(of: searchFocused) { _, focused in ui.searchFocused = focused }
         .overlay(alignment: .trailing) {
             Rectangle().fill(Theme.sidebarBorder).frame(width: 1)
         }
@@ -208,7 +209,7 @@ struct Sidebar: View {
 
     /// 1-based jump number among today's needs, first nine only.
     private func number(of item: ReminderSnapshot) -> Int? {
-        guard ui.commandHeld else { return nil }
+        guard ui.commandHeld, ui.canJump(in: model) else { return nil }
         guard let index = inbox.firstIndex(where: { $0.id == item.id }), index < 9 else { return nil }
         return index + 1
     }
