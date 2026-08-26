@@ -202,7 +202,9 @@ struct InboxView: View {
                 .lineLimit(2)
                 .foregroundStyle(compact ? .secondary : .primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, compact ? 2 : 6)
+                // Tight rows: swipe actions scale with row height, and a tall
+                // row made them dominate the screen.
+                .padding(.vertical, compact ? 0 : 2)
         }
         .listRowSeparator(.hidden, edges: .top)
         .listRowSeparator(compact || isLast ? .hidden : .visible, edges: .bottom)
@@ -252,7 +254,7 @@ struct InboxView: View {
                     .foregroundStyle(.secondary)
                 Spacer()
             }
-            .padding(.vertical, 6)
+            .padding(.vertical, 2)
         }
         .listRowSeparator(.hidden, edges: .top)
         .listRowSeparatorTint(.primary.opacity(0.08))

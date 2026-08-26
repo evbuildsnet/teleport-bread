@@ -64,10 +64,15 @@ struct ThreadView: View {
                                         Label("Delete", systemImage: "trash")
                                     }
                                 } label: {
+                                    // Small glyph, generous target: the hit
+                                    // area grows leftwards so the dots stay
+                                    // tucked under the bubble's corner.
                                     Image(systemName: "ellipsis")
                                         .font(.caption.weight(.bold))
                                         .foregroundStyle(.quaternary)
                                         .frame(width: 28, height: 22)
+                                        .padding(.leading, 20)
+                                        .padding(.vertical, 5)
                                         .contentShape(Rectangle())
                                 }
                                 .tint(.primary)
