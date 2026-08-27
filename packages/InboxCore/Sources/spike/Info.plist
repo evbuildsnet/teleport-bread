@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>dev.ev.inboxzero.spike</string>
+	<string>dev.ev.teleportbread.spike</string>
 	<key>CFBundleName</key>
 	<string>spike</string>
 	<key>CFBundleShortVersionString</key>

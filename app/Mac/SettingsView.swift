@@ -68,7 +68,7 @@ struct SettingsView: View {
                             launchAtLogin = SMAppService.mainApp.status == .enabled
                         }
                     }
-                Text("Keep InboxZero running so the capture shortcut is always live, even with the window closed.")
+                Text("Keep Teleport Bread running so the capture shortcut is always live, even with the window closed.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

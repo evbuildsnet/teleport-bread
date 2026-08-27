@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FDFDFD"/><stop offset="1" stop-color="#F4F4F5"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#66D3E8"/><stop offset="1" stop-color="#4D9DE8"/>
+    </linearGradient>
+    <linearGradient id="crustTop" x1="0.25" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#5E3B14"/><stop offset="0.3" stop-color="#6E4719"/>
+      <stop offset="0.55" stop-color="#8A5A26"/><stop offset="0.8" stop-color="#AF7F3E"/>
+      <stop offset="1" stop-color="#CFA057"/>
+    </linearGradient>
+    <radialGradient id="crustCore" cx="0.42" cy="0.22" r="0.55">
+      <stop offset="0" stop-color="#523310" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#523310" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="crustSheen" x1="0.1" y1="0" x2="0.32" y2="0.6">
+      <stop offset="0" stop-color="#FBEFCB" stop-opacity="0.25"/>
+      <stop offset="0.5" stop-color="#FBEFCB" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#FBEFCB" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0.25" y2="1">
+      <stop offset="0" stop-color="#F0DCA6"/><stop offset="0.55" stop-color="#E6C88B"/>
+      <stop offset="1" stop-color="#C79F61"/>
+    </linearGradient>
+    <linearGradient id="endLight" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FCF3D5" stop-opacity="0.3"/>
+      <stop offset="0.3" stop-color="#FCF3D5" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="turnAway" x1="0" y1="0" x2="1" y2="0.2">
+      <stop offset="0.55" stop-color="#8A6534" stop-opacity="0"/>
+      <stop offset="1" stop-color="#7A5528" stop-opacity="0.4"/>
+    </linearGradient>
+  </defs>
+<g id="layer-bg"><rect width="1024" height="1024" fill="url(#bg)"/></g>
+</svg>

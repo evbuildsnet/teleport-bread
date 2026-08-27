@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>InboxZero</string>
+	<string>Teleport Bread</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -25,8 +25,8 @@
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
 	<key>NSRemindersFullAccessUsageDescription</key>
-	<string>InboxZero is a triage surface over your existing reminders.</string>
+	<string>Teleport Bread is a triage surface over your existing reminders.</string>
 	<key>NSRemindersUsageDescription</key>
-	<string>InboxZero is a triage surface over your existing reminders.</string>
+	<string>Teleport Bread is a triage surface over your existing reminders.</string>
 </dict>
 </plist>

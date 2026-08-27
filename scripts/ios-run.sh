@@ -5,7 +5,7 @@ set -euo pipefail
 
 sim_name=$1
 app=$2
-bundle=dev.ev.inboxzero.app
+bundle=dev.ev.teleportbread.app
 
 udid=$(xcrun simctl list devices available | grep -F "$sim_name (" | head -1 | sed -E 's/.*\(([0-9A-F-]+)\).*/\1/')
 if [[ -z $udid ]]; then

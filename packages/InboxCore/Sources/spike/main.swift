@@ -6,10 +6,10 @@ import InboxCore
 //   1. Full-access request works from a CLI binary.
 //   2. A date-only due date roundtrips cleanly.
 //   3. A NoteCodec log (U+2063 separators) roundtrips through EventKit.
-// Leaves a "InboxZero Spike" list behind for manual iCloud/iPhone checks.
+// Leaves a "Teleport Bread Spike" list behind for manual iCloud/iPhone checks.
 
-let spikeListName = "InboxZero Spike"
-let logPath = "/tmp/inboxzero-spike.log"
+let spikeListName = "Teleport Bread Spike"
+let logPath = "/tmp/teleportbread-spike.log"
 
 func print(_ message: String) {
     Swift.print(message)

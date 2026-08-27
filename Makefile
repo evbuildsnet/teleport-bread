@@ -2,10 +2,10 @@
 # Xcode open; run targets stay in the foreground so ⌃C stops them.
 
 DERIVED  := DerivedData
-PROJECT  := app/InboxZero.xcodeproj
+PROJECT  := app/TeleportBread.xcodeproj
 SIM      ?= iPhone 17 Pro
-MAC_APP  := $(DERIVED)/Build/Products/Debug/InboxZero.app
-IOS_APP  := $(DERIVED)/Build/Products/Debug-iphonesimulator/InboxZero.app
+MAC_APP  := $(DERIVED)/Build/Products/Debug/TeleportBread.app
+IOS_APP  := $(DERIVED)/Build/Products/Debug-iphonesimulator/TeleportBread.app
 XCODEBUILD := xcodebuild -project $(PROJECT) -derivedDataPath $(DERIVED) -configuration Debug -quiet
 
 .DEFAULT_GOAL := help
@@ -18,16 +18,16 @@ gen: ## regenerate the Xcode project from app/project.yml (picks up new files)
 	@cd app && xcodegen generate -q
 
 build-mac: gen ## build the Mac app
-	@$(XCODEBUILD) -scheme InboxZeroMac -destination "platform=macOS,arch=arm64" build
+	@$(XCODEBUILD) -scheme TeleportBreadMac -destination "platform=macOS,arch=arm64" build
 
 mac: build-mac ## build + run the Mac app on your real Reminders (⌃C quits)
-	@exec $(MAC_APP)/Contents/MacOS/InboxZero
+	@exec $(MAC_APP)/Contents/MacOS/TeleportBread
 
 mac-preview: build-mac ## build + run the Mac app on in-memory sample data (⌃C quits)
-	@INBOXZERO_PREVIEW=1 exec $(MAC_APP)/Contents/MacOS/InboxZero
+	@TELEPORTBREAD_PREVIEW=1 exec $(MAC_APP)/Contents/MacOS/TeleportBread
 
 build-ios: gen ## build the iOS app for the simulator (SIM="iPhone 17 Pro" by default)
-	@$(XCODEBUILD) -scheme InboxZero -destination "platform=iOS Simulator,name=$(SIM)" build
+	@$(XCODEBUILD) -scheme TeleportBread -destination "platform=iOS Simulator,name=$(SIM)" build
 
 ios: build-ios ## build + run on the simulator, app log in this terminal (⌃C quits the app)
 	@scripts/ios-run.sh "$(SIM)" $(IOS_APP)
@@ -36,14 +36,14 @@ test: ## InboxCore unit tests
 	@cd packages/InboxCore && swift test
 
 test-mac: gen ## Mac UI tests (creates and settles real reminders)
-	@$(XCODEBUILD) -scheme InboxZeroMac -destination "platform=macOS,arch=arm64" test
+	@$(XCODEBUILD) -scheme TeleportBreadMac -destination "platform=macOS,arch=arm64" test
 
 test-ios: gen ## iOS UI tests on the simulator
-	@$(XCODEBUILD) -scheme InboxZero -destination "platform=iOS Simulator,name=$(SIM)" test
+	@$(XCODEBUILD) -scheme TeleportBread -destination "platform=iOS Simulator,name=$(SIM)" test
 
-snapshots: build-mac ## render the Mac UI states to /tmp/inboxzero-snapshots/*.png (headless)
-	@INBOXZERO_PREVIEW=1 INBOXZERO_SNAPSHOT_DIR=/tmp/inboxzero-snapshots $(MAC_APP)/Contents/MacOS/InboxZero 2>/dev/null; \
-	echo "→ /tmp/inboxzero-snapshots"; ls /tmp/inboxzero-snapshots
+snapshots: build-mac ## render the Mac UI states to /tmp/teleportbread-snapshots/*.png (headless)
+	@TELEPORTBREAD_PREVIEW=1 TELEPORTBREAD_SNAPSHOT_DIR=/tmp/teleportbread-snapshots $(MAC_APP)/Contents/MacOS/TeleportBread 2>/dev/null; \
+	echo "→ /tmp/teleportbread-snapshots"; ls /tmp/teleportbread-snapshots
 
 clean: ## drop build products
 	@rm -rf $(DERIVED)

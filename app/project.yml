@@ -1,6 +1,6 @@
-name: InboxZero
+name: TeleportBread
 options:
-  bundleIdPrefix: dev.ev.inboxzero
+  bundleIdPrefix: dev.ev.teleportbread
   deploymentTarget:
     iOS: "26.0"
     macOS: "26.0"
@@ -12,83 +12,93 @@ packages:
   InboxCore:
     path: ../packages/InboxCore
 targets:
-  InboxZero:
+  TeleportBread:
     type: application
     platform: iOS
-    sources: [Sources, Shared]
+    sources:
+      - Sources
+      - Shared
+      - path: ../design/TeleportBread.icon
+        buildPhase: resources
     dependencies:
       - package: InboxCore
     info:
       path: Info.plist
       properties:
-        CFBundleDisplayName: InboxZero
-        NSRemindersFullAccessUsageDescription: "InboxZero is a triage surface over your existing reminders."
-        NSRemindersUsageDescription: "InboxZero is a triage surface over your existing reminders."
+        CFBundleDisplayName: Bread
+        NSRemindersFullAccessUsageDescription: "Teleport Bread is a triage surface over your existing reminders."
+        NSRemindersUsageDescription: "Teleport Bread is a triage surface over your existing reminders."
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.ev.inboxzero.app
+        PRODUCT_BUNDLE_IDENTIFIER: dev.ev.teleportbread.app
         TARGETED_DEVICE_FAMILY: "1"
-  InboxZeroUITests:
+        ASSETCATALOG_COMPILER_APPICON_NAME: TeleportBread
+  TeleportBreadUITests:
     type: bundle.ui-testing
     platform: iOS
     sources: [UITests]
     dependencies:
-      - target: InboxZero
+      - target: TeleportBread
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.ev.inboxzero.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: dev.ev.teleportbread.uitests
         GENERATE_INFOPLIST_FILE: YES
-  InboxZeroMac:
+  TeleportBreadMac:
     type: application
     platform: macOS
-    sources: [Mac, Shared]
+    sources:
+      - Mac
+      - Shared
+      - path: ../design/TeleportBread.icon
+        buildPhase: resources
     dependencies:
       - package: InboxCore
     info:
       path: Mac/Info.plist
       properties:
-        CFBundleDisplayName: InboxZero
-        NSRemindersFullAccessUsageDescription: "InboxZero is a triage surface over your existing reminders."
-        NSRemindersUsageDescription: "InboxZero is a triage surface over your existing reminders."
+        CFBundleDisplayName: Teleport Bread
+        NSRemindersFullAccessUsageDescription: "Teleport Bread is a triage surface over your existing reminders."
+        NSRemindersUsageDescription: "Teleport Bread is a triage surface over your existing reminders."
         LSApplicationCategoryType: public.app-category.productivity
         NSHumanReadableCopyright: ""
     # No App Sandbox for now: on macOS 26 the sandboxed dev build's Reminders
     # request dies in calaccessd (XPC 4099) before any consent dialog.
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.ev.inboxzero.mac
-        PRODUCT_NAME: InboxZero
+        PRODUCT_BUNDLE_IDENTIFIER: dev.ev.teleportbread.mac
+        PRODUCT_NAME: TeleportBread
         ENABLE_HARDENED_RUNTIME: YES
-  InboxZeroMacUITests:
+        ASSETCATALOG_COMPILER_APPICON_NAME: TeleportBread
+  TeleportBreadMacUITests:
     type: bundle.ui-testing
     platform: macOS
     sources: [MacUITests]
     dependencies:
-      - target: InboxZeroMac
+      - target: TeleportBreadMac
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.ev.inboxzero.mac.uitests
+        PRODUCT_BUNDLE_IDENTIFIER: dev.ev.teleportbread.mac.uitests
         GENERATE_INFOPLIST_FILE: YES
 schemes:
-  InboxZero:
+  TeleportBread:
     build:
       targets:
-        InboxZero: all
-        InboxZeroUITests: [test]
+        TeleportBread: all
+        TeleportBreadUITests: [test]
     run:
       config: Debug
     test:
       config: Debug
-      targets: [InboxZeroUITests]
-  InboxZeroMac:
+      targets: [TeleportBreadUITests]
+  TeleportBreadMac:
     build:
       targets:
-        InboxZeroMac: all
-        InboxZeroMacUITests: [test]
+        TeleportBreadMac: all
+        TeleportBreadMacUITests: [test]
     run:
       config: Debug
     test:
       config: Debug
-      targets: [InboxZeroMacUITests]
+      targets: [TeleportBreadMacUITests]

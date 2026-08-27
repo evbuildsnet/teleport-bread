@@ -2,7 +2,7 @@ import XCTest
 
 /// Each test creates its own uniquely named need through the UI and settles
 /// it at the end, so runs don't depend on seed data and don't accumulate.
-final class InboxZeroMacUITests: XCTestCase {
+final class TeleportBreadMacUITests: XCTestCase {
     var app: XCUIApplication!
     /// Needs created by the running test; tearDown settles whatever a failed
     /// test left active so no stray reminders accumulate.

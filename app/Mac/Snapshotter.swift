@@ -1,13 +1,13 @@
 import AppKit
 import SwiftUI
 
-/// Headless review aid: `INBOXZERO_PREVIEW=1 INBOXZERO_SNAPSHOT_DIR=/path`
+/// Headless review aid: `TELEPORTBREAD_PREVIEW=1 TELEPORTBREAD_SNAPSHOT_DIR=/path`
 /// runs the window on in-memory preview data, renders a set of states to
 /// PNG (no screen or Reminders access needed) and quits.
 @MainActor
 enum Snapshotter {
     static var directory: URL? {
-        ProcessInfo.processInfo.environment["INBOXZERO_SNAPSHOT_DIR"].map { URL(fileURLWithPath: $0) }
+        ProcessInfo.processInfo.environment["TELEPORTBREAD_SNAPSHOT_DIR"].map { URL(fileURLWithPath: $0) }
     }
 
     static func run(model: AppModel, ui: UIState) async {

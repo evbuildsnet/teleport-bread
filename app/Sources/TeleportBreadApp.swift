@@ -2,7 +2,7 @@ import InboxCore
 import SwiftUI
 
 @main
-struct InboxZeroApp: App {
+struct TeleportBreadApp: App {
     @State private var model = AppModel()
 
     var body: some Scene {
@@ -26,7 +26,7 @@ struct RootView: View {
                 ContentUnavailableView(
                     "No Reminders access",
                     systemImage: "lock",
-                    description: Text("InboxZero is a lens over Apple Reminders. Grant full access in Settings → Privacy & Security → Reminders.")
+                    description: Text("Teleport Bread is a lens over Apple Reminders. Grant full access in Settings → Privacy & Security → Reminders.")
                 )
             case .ready:
                 InboxView()

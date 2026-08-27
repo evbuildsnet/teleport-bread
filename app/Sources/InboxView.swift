@@ -171,7 +171,7 @@ struct InboxView: View {
             }
         } else if inbox.isEmpty && drafts.isEmpty {
             ContentUnavailableView(
-                "Inbox Zero",
+                "All settled",
                 systemImage: "checkmark.circle",
                 description: Text("Nothing due. Enjoy the quiet.")
             )

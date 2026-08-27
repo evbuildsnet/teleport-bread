@@ -3,7 +3,7 @@ import XCTest
 /// Each test creates its own uniquely named reminder through the capture UI
 /// and settles it at the end, so runs don't depend on seed data or a clean
 /// simulator and don't accumulate rows.
-final class InboxZeroUITests: XCTestCase {
+final class TeleportBreadUITests: XCTestCase {
     var app: XCUIApplication!
 
     override func setUp() {

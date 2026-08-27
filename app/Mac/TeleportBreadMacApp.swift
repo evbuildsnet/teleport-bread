@@ -3,13 +3,13 @@ import InboxCore
 import SwiftUI
 
 @main
-struct InboxZeroMacApp: App {
-    @State private var model = ProcessInfo.processInfo.environment["INBOXZERO_PREVIEW"] == nil ? AppModel() : AppModel.preview()
+struct TeleportBreadMacApp: App {
+    @State private var model = ProcessInfo.processInfo.environment["TELEPORTBREAD_PREVIEW"] == nil ? AppModel() : AppModel.preview()
     @State private var ui = UIState()
     @State private var shortcuts = Shortcuts.shared
 
     var body: some Scene {
-        WindowGroup("InboxZero") {
+        WindowGroup("Bread") {
             MacRootView()
                 .environment(model)
                 .environment(ui)
@@ -63,7 +63,7 @@ struct MacRootView: View {
                 ContentUnavailableView(
                     "No Reminders access",
                     systemImage: "lock",
-                    description: Text("InboxZero is a lens over Apple Reminders. Grant full access in System Settings → Privacy & Security → Reminders.")
+                    description: Text("Teleport Bread is a lens over Apple Reminders. Grant full access in System Settings → Privacy & Security → Reminders.")
                 )
             case .ready:
                 MainWindow()

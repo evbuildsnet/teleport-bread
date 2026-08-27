@@ -68,7 +68,7 @@ struct Sidebar: View {
         return VStack(spacing: 8) {
             HStack(spacing: 2) {
                 Spacer().frame(width: 70) // traffic lights
-                Text("InboxZero")
+                Text("Bread")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.sidebarText)
                     .padding(.trailing, 6)
@@ -141,7 +141,7 @@ struct Sidebar: View {
                     emptyLabel("No results")
                 }
             } else if drafts.isEmpty {
-                emptyLabel("Inbox Zero")
+                emptyLabel("All settled")
             }
         } else {
             ForEach(inbox) { item in
