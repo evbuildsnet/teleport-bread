@@ -7,7 +7,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    DEVELOPMENT_TEAM: 8X2Q3D3Y48
+    DEVELOPMENT_TEAM: CPUP238G9V
 packages:
   InboxCore:
     path: ../packages/InboxCore
