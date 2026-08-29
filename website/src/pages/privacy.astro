@@ -1,0 +1,80 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base
+  title="Privacy Policy — Teleport Bread"
+  description="Teleport Bread collects no user data. No accounts, no servers, no tracking in the app."
+>
+  <main>
+    <h1>Privacy Policy</h1>
+    <p class="updated">Effective August 29, 2026</p>
+
+    <h2>The short version</h2>
+    <p>
+      Teleport Bread collects <strong>nothing</strong>. The app has no accounts,
+      no servers, no analytics, and makes no network requests of its own.
+    </p>
+
+    <h2>How the app works</h2>
+    <p>
+      Teleport Bread is a user interface layer over Apple Reminders. Your needs,
+      notes, and due dates are stored by Apple's Reminders service (EventKit) on
+      your device and in your iCloud account, under
+      <a href="https://www.apple.com/legal/privacy/">Apple's privacy terms</a>.
+      The app reads and writes that data locally, only after you grant Reminders
+      access, and sends it nowhere else. We never see it.
+    </p>
+
+    <h2>What we don't do</h2>
+    <ul>
+      <li>No data collection, telemetry, or analytics inside the app</li>
+      <li>No third-party SDKs inside the app</li>
+      <li>No accounts, sign-ups, or profiles</li>
+      <li>No selling or sharing of data — we have nothing to sell or share</li>
+    </ul>
+
+    <h2>TestFlight betas</h2>
+    <p>
+      If you join a beta through TestFlight, Apple may share crash logs and
+      feedback you choose to submit with us, as described in
+      <a href="https://www.apple.com/legal/internet-services/itunes/testflight/">Apple's TestFlight terms</a>.
+    </p>
+
+    <h2>This website</h2>
+    <p>
+      This website (not the app) uses PostHog for anonymous usage analytics —
+      page views and similar aggregate statistics — to understand interest in
+      the project. No advertising, no cross-site tracking, no sale of data.
+    </p>
+
+    <h2>Contact</h2>
+    <p>
+      Questions: <a href="mailto:help@evbuilds.net">help@evbuilds.net</a>
+    </p>
+  </main>
+</Base>
+
+<style>
+  main {
+    max-width: 640px;
+    padding-top: 8vh;
+    width: 100%;
+  }
+  h1 {
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+  }
+  .updated {
+    color: var(--muted);
+    font-size: 14px;
+    margin-top: 0;
+  }
+  h2 {
+    margin-top: 32px;
+    font-size: 20px;
+  }
+  a {
+    color: var(--accent);
+  }
+</style>

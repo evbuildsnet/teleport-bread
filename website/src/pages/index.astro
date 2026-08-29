@@ -1,0 +1,71 @@
+---
+import Base from "../layouts/Base.astro";
+---
+
+<Base
+  title="Teleport Bread — Settle needs. Not bread."
+  description="A fast, minimal UI over Apple Reminders. Capture a need, message your future self, snooze what can wait, settle what matters."
+>
+  <main>
+    <img class="icon" src="/icon.png" alt="Teleport Bread icon" width="160" height="160" />
+    <h1>Teleport Bread</h1>
+    <p class="tagline">Settle needs. Not bread.</p>
+    <p class="pitch">
+      A fast, minimal UI over Apple Reminders. Capture a need, message your
+      future self, snooze what can wait, settle what matters. Private by
+      design&nbsp;— your data never leaves the Apple ecosystem.
+    </p>
+    <div class="actions">
+      <span class="soon">Public beta on TestFlight — soon</span>
+      <a class="gh" href="https://github.com/evbuildsnet/teleport-bread">View source on GitHub</a>
+    </div>
+  </main>
+</Base>
+
+<style>
+  main {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding-top: 12vh;
+    max-width: 560px;
+  }
+  .icon {
+    border-radius: 22.5%;
+  }
+  h1 {
+    font-size: 40px;
+    margin: 28px 0 0;
+    letter-spacing: -0.02em;
+  }
+  .tagline {
+    font-size: 20px;
+    color: var(--muted);
+    margin: 8px 0 0;
+  }
+  .pitch {
+    margin: 24px 0 0;
+    font-size: 17px;
+  }
+  .actions {
+    margin-top: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+  }
+  .soon {
+    background: var(--accent);
+    color: #fff;
+    opacity: 0.65;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+  }
+  .gh {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+  }
+</style>

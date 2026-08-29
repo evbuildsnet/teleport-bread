@@ -1,0 +1,15 @@
+{
+  "name": "teleport-bread-website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "start": "serve dist -s -l ${PORT:-3000}"
+  },
+  "dependencies": {
+    "astro": "^5.0.0",
+    "serve": "^14.2.0"
+  }
+}
