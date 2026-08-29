@@ -29,6 +29,7 @@ targets:
         NSRemindersFullAccessUsageDescription: "Teleport Bread is a triage surface over your existing reminders."
         NSRemindersUsageDescription: "Teleport Bread is a triage surface over your existing reminders."
         UILaunchScreen: {}
+        ITSAppUsesNonExemptEncryption: false
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
     settings:
       base:

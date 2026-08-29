@@ -20,6 +20,8 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSRemindersFullAccessUsageDescription</key>
 	<string>Teleport Bread is a triage surface over your existing reminders.</string>
 	<key>NSRemindersUsageDescription</key>
