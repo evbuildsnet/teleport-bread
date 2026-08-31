@@ -16,7 +16,7 @@ import Base from "../layouts/Base.astro";
       design&nbsp;— your data never leaves the Apple ecosystem.
     </p>
     <div class="actions">
-      <span class="soon">Public beta on TestFlight — soon</span>
+      <a class="beta" href="https://testflight.apple.com/join/EjA9WTnY">Join the public beta on TestFlight</a>
       <a class="gh" href="https://github.com/evbuildsnet/teleport-bread">View source on GitHub</a>
     </div>
   </main>
@@ -55,13 +55,13 @@ import Base from "../layouts/Base.astro";
     gap: 12px;
     align-items: center;
   }
-  .soon {
+  .beta {
     background: var(--accent);
     color: #fff;
-    opacity: 0.65;
     padding: 12px 24px;
     border-radius: 12px;
     font-weight: 600;
+    text-decoration: none;
   }
   .gh {
     color: var(--accent);
