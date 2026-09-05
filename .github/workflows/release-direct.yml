@@ -1,0 +1,89 @@
+# Direct-download release. Push a tag like v1.2.0 and this:
+#   1. archives the TeleportBreadMacDirect target with Developer ID
+#   2. notarizes and staples it
+#   3. signs the zip for Sparkle and appends it to the appcast
+#   4. publishes a GitHub Release with the zip
+#   5. commits the appcast to main, which deploys teleportbread.com
+# Users only see the update once step 5 lands, so a failed build never ships.
+#
+# Secrets: DEVELOPER_ID_P12_BASE64, DEVELOPER_ID_P12_PASSWORD,
+#          NOTARY_KEY_ID, NOTARY_ISSUER_ID, NOTARY_KEY_P8, SPARKLE_PRIVATE_KEY
+name: Release (direct download)
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-direct
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Version from tag
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "build=$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Import Developer ID certificate
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.DEVELOPER_ID_P12_BASE64 }}
+          p12-password: ${{ secrets.DEVELOPER_ID_P12_PASSWORD }}
+
+      - name: Archive, notarize, zip
+        env:
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+        run: |
+          export NOTARY_KEY_PATH="$RUNNER_TEMP/notary.p8"
+          printf '%s' "$NOTARY_KEY_P8" > "$NOTARY_KEY_PATH"
+          scripts/release-direct.sh "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.build }}" dist
+
+      - name: Update appcast
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          # Start from the appcast on main, not the tag's snapshot, so earlier
+          # releases published after this tag was cut are kept.
+          git fetch origin main
+          git show origin/main:website/public/appcast.xml > website/public/appcast.xml
+          scripts/appcast.sh dist \
+            "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/" \
+            website/public/appcast.xml
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            "dist/TeleportBread-${{ steps.version.outputs.version }}.zip" \
+            --title "Teleport Bread ${{ steps.version.outputs.version }}" --generate-notes
+
+      - name: Publish appcast to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          cp website/public/appcast.xml "$RUNNER_TEMP/appcast.xml"
+          git checkout -- website/public/appcast.xml
+          git fetch origin main
+          git checkout -B main origin/main
+          cp "$RUNNER_TEMP/appcast.xml" website/public/appcast.xml
+          git add website/public/appcast.xml
+          git commit -m "Publish ${{ github.ref_name }} to the Sparkle appcast"
+          git push origin main

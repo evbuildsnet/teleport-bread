@@ -18,6 +18,9 @@ struct TeleportBreadMacApp: App {
         .defaultSize(width: 1100, height: 780)
         Settings { SettingsView() }
         .commands {
+            #if DIRECT
+            CommandGroup(after: .appInfo) { CheckForUpdatesMenuItem() }
+            #endif
             // Keys are dispatched by KeyBindings (context-aware) before the
             // menu sees them; the menu shows the combos and runs the same
             // commands on click.

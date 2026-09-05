@@ -72,6 +72,9 @@ struct SettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+            #if DIRECT
+            UpdatesSettingsSection()
+            #endif
         }
         .formStyle(.grouped)
         .frame(width: 460)

@@ -8,9 +8,51 @@ settings:
   base:
     SWIFT_VERSION: "6.0"
     DEVELOPMENT_TEAM: CPUP238G9V
+    # Release builds override both from the git tag (see scripts/release.sh).
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
 packages:
   InboxCore:
     path: ../packages/InboxCore
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.9.6
+targetTemplates:
+  MacApp:
+    type: application
+    platform: macOS
+    sources:
+      - Mac
+      - Shared
+      - path: ../design/TeleportBread.icon
+        buildPhase: resources
+    dependencies:
+      - package: InboxCore
+    info:
+      path: Mac/Info.plist
+      properties:
+        CFBundleDisplayName: Teleport Bread
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSRemindersFullAccessUsageDescription: "Teleport Bread is a triage surface over your existing reminders."
+        NSRemindersUsageDescription: "Teleport Bread is a triage surface over your existing reminders."
+        LSApplicationCategoryType: public.app-category.productivity
+        NSHumanReadableCopyright: ""
+    # App Sandbox is required for the Mac App Store. Reminders go through
+    # CalendarAgent, and the sandbox only opens that mach service for the
+    # `calendars` entitlement (see /System/Library/Sandbox/Profiles/application.sb).
+    # Without it the request dies with XPC 4099 before any consent dialog.
+    entitlements:
+      path: Mac/TeleportBread.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.personal-information.calendars: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.ev.teleportbread.mac
+        PRODUCT_NAME: TeleportBread
+        ENABLE_HARDENED_RUNTIME: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: TeleportBread
 targets:
   TeleportBread:
     type: application
@@ -46,32 +88,36 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.ev.teleportbread.uitests
         GENERATE_INFOPLIST_FILE: YES
+  # Two Mac targets, one code base. `TeleportBreadMac` is the App Store build:
+  # sandboxed, updates come from Apple. `TeleportBreadMacDirect` is the
+  # notarized download from teleportbread.com: same sandbox plus Sparkle,
+  # compiled in only under the DIRECT condition. Both share the bundle id.
   TeleportBreadMac:
-    type: application
-    platform: macOS
-    sources:
-      - Mac
-      - Shared
-      - path: ../design/TeleportBread.icon
-        buildPhase: resources
+    templates: [MacApp]
+  TeleportBreadMacDirect:
+    templates: [MacApp]
     dependencies:
-      - package: InboxCore
+      - package: Sparkle
     info:
-      path: Mac/Info.plist
+      path: Mac/InfoDirect.plist
       properties:
-        CFBundleDisplayName: Teleport Bread
-        NSRemindersFullAccessUsageDescription: "Teleport Bread is a triage surface over your existing reminders."
-        NSRemindersUsageDescription: "Teleport Bread is a triage surface over your existing reminders."
-        LSApplicationCategoryType: public.app-category.productivity
-        NSHumanReadableCopyright: ""
-    # No App Sandbox for now: on macOS 26 the sandboxed dev build's Reminders
-    # request dies in calaccessd (XPC 4099) before any consent dialog.
+        SUPublicEDKey: Ag1DQ5+weZl4IxTr9P6nJ4yF14OgRULxWHg9TkBQiEY=
+        SUFeedURL: https://teleportbread.com/appcast.xml
+        # Privacy default: never touch the network until the user opts in
+        # from Settings. No first-launch permission prompt either.
+        SUEnableAutomaticChecks: false
+        # Sandboxed apps install updates through Sparkle's XPC launcher.
+        SUEnableInstallerLauncherService: true
+    entitlements:
+      path: Mac/TeleportBreadDirect.entitlements
+      properties:
+        com.apple.security.network.client: true
+        com.apple.security.temporary-exception.mach-lookup.global-name:
+          - $(PRODUCT_BUNDLE_IDENTIFIER)-spks
+          - $(PRODUCT_BUNDLE_IDENTIFIER)-spki
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.ev.teleportbread.mac
-        PRODUCT_NAME: TeleportBread
-        ENABLE_HARDENED_RUNTIME: YES
-        ASSETCATALOG_COMPILER_APPICON_NAME: TeleportBread
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) DIRECT
   TeleportBreadMacUITests:
     type: bundle.ui-testing
     platform: macOS
@@ -103,3 +149,9 @@ schemes:
     test:
       config: Debug
       targets: [TeleportBreadMacUITests]
+  TeleportBreadMacDirect:
+    build:
+      targets:
+        TeleportBreadMacDirect: all
+    run:
+      config: Debug
