@@ -19,6 +19,7 @@ mkdir -p "$out"
 xcodebuild -project "$root/app/TeleportBread.xcodeproj" -scheme TeleportBreadMacDirect \
   -configuration Release -destination "platform=macOS,arch=arm64" \
   -archivePath "$archive" MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build" \
+  CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Developer ID Application" \
   -quiet archive
 xcodebuild -exportArchive -archivePath "$archive" -exportPath "$export_dir" \
   -exportOptionsPlist "$root/app/ExportOptions-DeveloperID.plist" -quiet
