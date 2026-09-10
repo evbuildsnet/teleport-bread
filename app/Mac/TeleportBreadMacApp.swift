@@ -110,7 +110,9 @@ struct MacRootView: View {
         NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyDown]) { event in
             let isFlagsChange = event.type == .flagsChanged
             let flags = event.modifierFlags
-            let characters = event.characters
+            // `characters` throws for flagsChanged events. AppKit swallows that
+            // on the main loop but not inside a modal alert, where it aborts.
+            let characters = isFlagsChange ? nil : event.characters
             let inTextControl = NSApp.keyWindow?.firstResponder is NSTextView
             // Keys for the capture panel (or any panel) are never ours to redirect.
             if event.window is NSPanel { return event }
