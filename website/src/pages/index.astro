@@ -1,5 +1,16 @@
 ---
 import Base from "../layouts/Base.astro";
+import { readFileSync } from "node:fs";
+
+// The Mac card reads the newest release from the Sparkle appcast, which the
+// release workflow commits here, so the site is never behind the app.
+const appcast = readFileSync(new URL("../../public/appcast.xml", import.meta.url), "utf8");
+const items = [...appcast.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(([, item]) => ({
+  build: Number(item.match(/<sparkle:version>(\d+)</)?.[1]),
+  version: item.match(/<sparkle:shortVersionString>([^<]+)</)?.[1],
+  url: item.match(/<enclosure url="([^"]+)"/)?.[1],
+}));
+const mac = items.sort((a, b) => b.build - a.build)[0];
 ---
 
 <Base
@@ -15,10 +26,21 @@ import Base from "../layouts/Base.astro";
       future self, snooze what can wait, settle what matters. Private by
       design&nbsp;— your data never leaves the Apple ecosystem.
     </p>
-    <div class="actions">
-      <a class="beta" href="https://testflight.apple.com/join/EjA9WTnY">Join the public beta on TestFlight</a>
-      <a class="gh" href="https://github.com/evbuildsnet/teleport-bread">View source on GitHub</a>
+    <div class="cards">
+      <a class="card" href="https://testflight.apple.com/join/EjA9WTnY">
+        <span class="platform">iPhone</span>
+        <span class="cta">Join the TestFlight beta</span>
+        <span class="note">Free, via Apple's TestFlight app.</span>
+      </a>
+      {mac && (
+        <a class="card" href={mac.url}>
+          <span class="platform">Mac</span>
+          <span class="cta">Download {mac.version}</span>
+          <span class="note">macOS 26 on Apple silicon. Notarized by Apple. Updates only if you turn that on.</span>
+        </a>
+      )}
     </div>
+    <a class="gh" href="https://github.com/evbuildsnet/teleport-bread">View source on GitHub</a>
   </main>
 </Base>
 
@@ -29,6 +51,7 @@ import Base from "../layouts/Base.astro";
     align-items: center;
     text-align: center;
     padding-top: 12vh;
+    width: 100%;
     max-width: 560px;
   }
   .icon {
@@ -48,24 +71,57 @@ import Base from "../layouts/Base.astro";
     margin: 24px 0 0;
     font-size: 17px;
   }
-  .actions {
+  .cards {
     margin-top: 32px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    width: 100%;
+  }
+  @media (max-width: 480px) {
+    .cards {
+      grid-template-columns: 1fr;
+    }
+  }
+  .card {
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    align-items: center;
-  }
-  .beta {
-    background: var(--accent);
-    color: #fff;
-    padding: 12px 24px;
-    border-radius: 12px;
-    font-weight: 600;
+    gap: 4px;
+    padding: 18px 20px;
+    border: 1px solid color-mix(in srgb, var(--muted) 30%, transparent);
+    border-radius: 16px;
+    text-align: left;
     text-decoration: none;
+    color: var(--text);
+    transition: border-color 0.15s;
+  }
+  .card:hover {
+    border-color: var(--accent);
+  }
+  .platform {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+  .cta {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .note {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.45;
   }
   .gh {
-    color: var(--accent);
+    margin-top: 20px;
+    color: var(--muted);
     text-decoration: none;
     font-weight: 500;
+  }
+  .gh:hover {
+    color: var(--text);
   }
 </style>
