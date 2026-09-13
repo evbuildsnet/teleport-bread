@@ -41,16 +41,21 @@ This target never contains Sparkle. Apple delivers its updates.
 
 ### iOS / TestFlight
 
-1. Set `MARKETING_VERSION` to the release version and increment `CURRENT_PROJECT_VERSION` in `app/project.yml`, then run `make gen`.
-2. Open `app/TeleportBread.xcodeproj`, select the `TeleportBread` scheme and a device destination, then Product → Archive.
-3. In Organizer: Distribute App → App Store Connect → Upload.
-4. On appstoreconnect.apple.com, assign the build to TestFlight or attach it to the iOS version and submit for review.
+One click. Run the "TestFlight (iOS)" workflow from the Actions tab or:
+
+```bash
+gh workflow run testflight.yml
+```
+
+`.github/workflows/testflight.yml` archives the `TeleportBread` target with the Apple Distribution certificate and uploads it to App Store Connect, which processes it into TestFlight. The version is `MARKETING_VERSION` from `app/project.yml` (override with the `version` input); the build number is the workflow run number. Signing is automatic through the App Store Connect API key, so no provisioning profiles live in the repo.
+
+Locally, `scripts/release-ios.sh` does the same with `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_PATH` set and the distribution certificate in the keychain.
 
 ### Minimum supported versions
 
 `website/public/app-version.json` is deployed to teleportbread.com with the site. Each native app fetches it once at launch, with no retry or foreground check. An unavailable or invalid file leaves the app usable.
 
-The `ios` and `mac` entries each specify `minimum`, `latest`, a `store` URL, and an optional `message` explaining a required update. iOS also has a `testflight` URL. Replace the placeholder store URLs when the App Store pages are published; until then, the apps fall back to teleportbread.com.
+The `ios` and `mac` entries each specify `minimum`, `latest`, an optional `store` URL, and an optional `message` explaining a required update. iOS also has a `testflight` URL. Add a `store` URL to each entry once the App Store pages are published; until then, the Update button falls back to teleportbread.com.
 
 To require an update, first make the replacement available through the affected stores and the Mac direct appcast, then bump that platform's `minimum` (and `latest` if needed), and commit the file to `main`. The site deployment makes the gate effective on the next app launch. Keep `latest` at least as high as `minimum`; bumping only `latest` shows a dismissable iOS banner. The Mac entry applies to both Mac channels.
 
@@ -58,7 +63,7 @@ The gate reads `CFBundleShortVersionString`, so `MARKETING_VERSION` must match t
 
 ### Secrets and keys
 
-The workflow needs these repository secrets: `DEVELOPER_ID_P12_BASE64`, `DEVELOPER_ID_P12_PASSWORD`, `NOTARY_KEY_ID`, `NOTARY_ISSUER_ID`, `NOTARY_KEY_P8`, `SPARKLE_PRIVATE_KEY`. Backups of the underlying files are in Ev's iCloud under Business/Personal/codes.
+The workflows need these repository secrets: `DEVELOPER_ID_P12_BASE64`, `DEVELOPER_ID_P12_PASSWORD`, `NOTARY_KEY_ID`, `NOTARY_ISSUER_ID`, `NOTARY_KEY_P8`, `SPARKLE_PRIVATE_KEY`, and for TestFlight `APPLE_DISTRIBUTION_P12_BASE64` and `APPLE_DISTRIBUTION_P12_PASSWORD`. The notary key is an App Store Connect API key and doubles as the TestFlight upload credential. Backups of the underlying files are in Ev's iCloud under Business/Personal/codes.
 
 The Sparkle private key is the one thing that cannot be rotated quietly: every shipped app trusts it. Guard it.
 

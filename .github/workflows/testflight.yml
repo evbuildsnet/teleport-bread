@@ -1,0 +1,61 @@
+# iOS TestFlight upload. Run it from the Actions tab (or `gh workflow run
+# testflight.yml`) and it:
+#   1. archives the TeleportBread iOS target with the Apple Distribution certificate
+#   2. uploads it to App Store Connect, which processes it into TestFlight
+# The version is MARKETING_VERSION from app/project.yml unless overridden;
+# the build number is the workflow run number and only goes up.
+#
+# Secrets: APPLE_DISTRIBUTION_P12_BASE64, APPLE_DISTRIBUTION_P12_PASSWORD,
+#          NOTARY_KEY_ID, NOTARY_ISSUER_ID, NOTARY_KEY_P8 (the App Store
+#          Connect API key doubles as the upload credential)
+name: TestFlight (iOS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Marketing version (defaults to MARKETING_VERSION in app/project.yml)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testflight
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        run: |
+          version="${{ inputs.version }}"
+          if [ -z "$version" ]; then
+            version=$(sed -n 's/^ *MARKETING_VERSION: *"\(.*\)"/\1/p' app/project.yml)
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "build=$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Import Apple Distribution certificate
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.APPLE_DISTRIBUTION_P12_BASE64 }}
+          p12-password: ${{ secrets.APPLE_DISTRIBUTION_P12_PASSWORD }}
+
+      - name: Archive and upload
+        env:
+          ASC_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+        run: |
+          export ASC_KEY_PATH="$RUNNER_TEMP/asc.p8"
+          printf '%s' "$ASC_KEY_P8" > "$ASC_KEY_PATH"
+          scripts/release-ios.sh "${{ steps.version.outputs.version }}" "${{ steps.version.outputs.build }}" dist

@@ -20,7 +20,7 @@ struct AppVersion: Comparable {
     }
 }
 
-/// Invalid policy data cannot lock anyone out. URLs may be unpublished.
+/// Invalid policy data cannot lock anyone out. Store URLs are optional until the pages exist.
 public struct VersionRequirement: Sendable {
     public enum Platform: String, Sendable { case ios, mac }
 
@@ -55,8 +55,7 @@ public struct VersionRequirement: Sendable {
     }
 
     private static func publishedURL(_ value: String?) -> URL? {
-        guard let value, !value.uppercased().contains("PLACEHOLDER"),
-              let url = URL(string: value), url.scheme == "https",
+        guard let value, let url = URL(string: value), url.scheme == "https",
               let host = url.host, !host.isEmpty else { return nil }
         return url
     }

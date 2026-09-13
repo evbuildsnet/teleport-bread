@@ -65,7 +65,7 @@ import Testing
     }
 
     @Test(arguments: [
-        "", #", "store":"https://apps.apple.com/app/idPLACEHOLDER""#,
+        "",
         #", "store":"not a URL", "testflight":"bad""#,
         #", "store":"file:///tmp/update""#,
     ])
