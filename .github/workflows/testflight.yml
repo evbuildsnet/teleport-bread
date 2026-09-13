@@ -6,8 +6,8 @@
 # the build number is the workflow run number and only goes up.
 #
 # Secrets: APPLE_DISTRIBUTION_P12_BASE64, APPLE_DISTRIBUTION_P12_PASSWORD,
-#          NOTARY_KEY_ID, NOTARY_ISSUER_ID, NOTARY_KEY_P8 (the App Store
-#          Connect API key doubles as the upload credential)
+#          ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (an Admin App Store Connect
+#          API key: it mints the provisioning profile and uploads the build)
 name: TestFlight (iOS)
 
 on:
@@ -52,9 +52,9 @@ jobs:
 
       - name: Archive and upload
         env:
-          ASC_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
-          ASC_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
         run: |
           export ASC_KEY_PATH="$RUNNER_TEMP/asc.p8"
           printf '%s' "$ASC_KEY_P8" > "$ASC_KEY_PATH"

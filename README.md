@@ -63,7 +63,7 @@ The gate reads `CFBundleShortVersionString`, so `MARKETING_VERSION` must match t
 
 ### Secrets and keys
 
-The workflows need these repository secrets: `DEVELOPER_ID_P12_BASE64`, `DEVELOPER_ID_P12_PASSWORD`, `NOTARY_KEY_ID`, `NOTARY_ISSUER_ID`, `NOTARY_KEY_P8`, `SPARKLE_PRIVATE_KEY`, and for TestFlight `APPLE_DISTRIBUTION_P12_BASE64` and `APPLE_DISTRIBUTION_P12_PASSWORD`. The notary key is an App Store Connect API key and doubles as the TestFlight upload credential. Backups of the underlying files, plus the API key id and issuer id, are in Ev's iCloud Drive under `Documents/Business/Personal/codes/teleport-bread-release`.
+The workflows need these repository secrets: `DEVELOPER_ID_P12_BASE64`, `DEVELOPER_ID_P12_PASSWORD`, `NOTARY_KEY_ID`, `NOTARY_ISSUER_ID`, `NOTARY_KEY_P8`, `SPARKLE_PRIVATE_KEY`, and for TestFlight `APPLE_DISTRIBUTION_P12_BASE64`, `APPLE_DISTRIBUTION_P12_PASSWORD`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`. The `ASC_*` key has the Admin role so it can mint provisioning profiles; the notary key does not. Backups of the underlying files, plus the API key id and issuer id, are in Ev's iCloud Drive under `Documents/Business/Personal/codes/teleport-bread-release`.
 
 The Sparkle private key is the one thing that cannot be rotated quietly: every shipped app trusts it. Guard it.
 
