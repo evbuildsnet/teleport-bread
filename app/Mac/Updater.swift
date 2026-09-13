@@ -3,8 +3,8 @@ import Observation
 import Sparkle
 import SwiftUI
 
-/// Sparkle, direct-download builds only. Automatic checks are off until the
-/// user opts in from Settings; until then the app never touches the network.
+/// Sparkle, direct-download builds only. Our launch task owns automatic
+/// checks so Sparkle never schedules a periodic check or permission prompt.
 /// Info.plist carries the feed URL and public key (see app/project.yml).
 @MainActor
 @Observable
@@ -14,15 +14,21 @@ final class Updater {
     private let controller: SPUStandardUpdaterController
     private let delegate = UpdaterDelegate()
     private var observation: NSKeyValueObservation?
+    private var checkedAtLaunch = false
+    private static let automaticChecksKey = "automaticUpdateChecks"
 
     private(set) var canCheck = false
     var automaticChecks: Bool {
-        didSet { controller.updater.automaticallyChecksForUpdates = automaticChecks }
+        didSet { UserDefaults.standard.set(automaticChecks, forKey: Self.automaticChecksKey) }
     }
 
     private init() {
-        controller = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: delegate, userDriverDelegate: nil)
-        automaticChecks = controller.updater.automaticallyChecksForUpdates
+        UserDefaults.standard.register(defaults: [Self.automaticChecksKey: true])
+        automaticChecks = UserDefaults.standard.bool(forKey: Self.automaticChecksKey)
+        controller = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: delegate, userDriverDelegate: nil)
+        // Older builds may have persisted an opt-in to Sparkle's scheduler.
+        controller.updater.automaticallyChecksForUpdates = false
+        controller.startUpdater()
         observation = controller.updater.observe(\.canCheckForUpdates, options: [.initial, .new]) { [weak self] _, change in
             guard let can = change.newValue else { return }
             Task { @MainActor in self?.canCheck = can }
@@ -30,6 +36,13 @@ final class Updater {
     }
 
     func check() { controller.updater.checkForUpdates() }
+
+    func checkAtLaunch() {
+        guard !checkedAtLaunch else { return }
+        checkedAtLaunch = true
+        guard automaticChecks else { return }
+        controller.updater.checkForUpdatesInBackground()
+    }
 }
 
 private final class UpdaterDelegate: NSObject, SPUUpdaterDelegate {
@@ -57,7 +70,7 @@ struct UpdatesSettingsSection: View {
     var body: some View {
         Section("Updates") {
             Toggle("Check for updates automatically", isOn: $updater.automaticChecks)
-            Text("Off by default. When on, Teleport Bread asks teleportbread.com once a day whether a newer version exists. Nothing about you or your reminders is sent.")
+            Text("On by default. Teleport Bread checks for updates once when the app launches. Nothing about you or your reminders is sent.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             Button("Check Now") { updater.check() }
