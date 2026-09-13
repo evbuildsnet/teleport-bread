@@ -10,7 +10,7 @@ enum Snapshotter {
         ProcessInfo.processInfo.environment["TELEPORTBREAD_SNAPSHOT_DIR"].map { URL(fileURLWithPath: $0) }
     }
 
-    static func run(model: AppModel, ui: UIState) async {
+    static func run(model: AppModel, ui: UIState, gate: VersionGate) async {
         guard let directory else { return }
         FileHandle.standardError.write(Data("snapshotter: start → \(directory.path)\n".utf8))
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -35,6 +35,12 @@ enum Snapshotter {
         }
 
         window.appearance = NSAppearance(named: .darkAqua)
+        if gate.required {
+            FileHandle.standardError.write(Data("snapshotter: version gate (reminders: \(model.phase))\n".utf8))
+            await shoot("10-version-lock")
+            NSApp.terminate(nil)
+            return
+        }
         ui.selection = model.inbox.first.map { .need($0.id) }
         await shoot("01-thread-dark")
         ui.snoozedExpanded = true
