@@ -107,8 +107,10 @@ targets:
       properties:
         SUPublicEDKey: Ag1DQ5+weZl4IxTr9P6nJ4yF14OgRULxWHg9TkBQiEY=
         SUFeedURL: https://teleportbread.com/appcast.xml
-        # Our launch task owns automatic checks. No Sparkle timer or prompt.
-        SUEnableAutomaticChecks: false
+        # On by default (no first-launch permission prompt), once a day. The
+        # app also checks once right at launch (see Mac/Updater.swift).
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
         # Sandboxed apps install updates through Sparkle's XPC launcher.
         SUEnableInstallerLauncherService: true
     entitlements:

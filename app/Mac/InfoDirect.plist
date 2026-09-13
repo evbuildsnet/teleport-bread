@@ -29,12 +29,14 @@
 	<key>NSRemindersUsageDescription</key>
 	<string>Teleport Bread is a triage surface over your existing reminders.</string>
 	<key>SUEnableAutomaticChecks</key>
-	<false/>
+	<true/>
 	<key>SUEnableInstallerLauncherService</key>
 	<true/>
 	<key>SUFeedURL</key>
 	<string>https://teleportbread.com/appcast.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>Ag1DQ5+weZl4IxTr9P6nJ4yF14OgRULxWHg9TkBQiEY=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 </dict>
 </plist>

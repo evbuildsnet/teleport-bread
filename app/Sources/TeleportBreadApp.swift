@@ -28,12 +28,13 @@ struct RootView: View {
                 content
             }
         }
-        .task { await gate.checkAtLaunch() }
+        .task { await gate.runDaily() }
         .task { await model.start() }
         .onChange(of: scenePhase) { _, phase in
             // Change events don't arrive while backgrounded; catch up on return.
             if phase == .active {
                 Task { await model.refresh() }
+                Task { await gate.checkIfStale() }
             }
         }
     }

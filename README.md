@@ -23,7 +23,7 @@ That triggers `.github/workflows/release-direct.yml`, which:
 4. publishes a GitHub Release with the zip,
 5. commits the appcast to `main`, which Railway deploys to teleportbread.com.
 
-Automatic checks are on by default and run once when the app launches. Users can turn them off in Settings or use "Check for Updates…" at any time. Watch a run with `gh run watch`.
+Automatic checks are on by default: once at launch and once a day after that. Users can turn them off in Settings or use "Check for Updates…" at any time. Watch a run with `gh run watch`.
 
 Version numbers come from the tag. The build number is the workflow run number and must only go up, so never delete and recreate a tag after a release has shipped.
 
@@ -53,7 +53,7 @@ Locally, `scripts/release-ios.sh <version> $(date -u +%Y%m%d%H%M) dist` does the
 
 ### Minimum supported versions
 
-`website/public/app-version.json` is deployed to teleportbread.com with the site. Each native app fetches it once at launch, with no retry or foreground check. An unavailable or invalid file leaves the app usable.
+`website/public/app-version.json` is deployed to teleportbread.com with the site. Each native app fetches it at launch and then at most once a day (on foreground return or from a daily timer), with no retry. An unavailable or invalid file leaves the app usable.
 
 The `ios` and `mac` entries each specify `minimum`, `latest`, an optional `store` URL, and an optional `message` explaining a required update. iOS also has a `testflight` URL. The Mac entry gets a `store` URL once the Mac App Store page exists; until then its Update button falls back to teleportbread.com.
 

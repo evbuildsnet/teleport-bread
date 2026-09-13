@@ -9,15 +9,30 @@ final class VersionGate {
     let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown"
     private(set) var requirement: VersionRequirement?
     var bannerDismissed = false
-    private var checked = false
+    private var lastCheck: Date?
+    private static let interval: TimeInterval = 24 * 60 * 60
 
     var required: Bool { requirement?.required ?? false }
     var available: Bool { requirement?.available ?? false }
 
-    func checkAtLaunch() async {
-        // The app owns one gate, even when multiple root windows run .task.
-        guard !checked else { return }
-        checked = true
+    /// Runs for the life of the root view: a check now, then one a day.
+    /// Foreground returns also call `checkIfStale`, which covers iOS where
+    /// the sleep is frozen while the app is suspended.
+    func runDaily() async {
+        while !Task.isCancelled {
+            await checkIfStale()
+            try? await Task.sleep(for: .seconds(Self.interval))
+        }
+    }
+
+    /// At most one request a day, shared by every caller.
+    func checkIfStale() async {
+        if let lastCheck, Date.now.timeIntervalSince(lastCheck) < Self.interval { return }
+        lastCheck = .now
+        await fetch()
+    }
+
+    private func fetch() async {
         var address = "https://teleportbread.com/app-version.json"
         #if DEBUG
         address = ProcessInfo.processInfo.environment["TELEPORTBREAD_VERSION_URL"] ?? address

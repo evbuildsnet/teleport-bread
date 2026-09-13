@@ -3,9 +3,10 @@ import Observation
 import Sparkle
 import SwiftUI
 
-/// Sparkle, direct-download builds only. Our launch task owns automatic
-/// checks so Sparkle never schedules a periodic check or permission prompt.
-/// Info.plist carries the feed URL and public key (see app/project.yml).
+/// Sparkle, direct-download builds only. Automatic checks are on by default:
+/// one right at launch, then Sparkle's own scheduler once a day. The toggle
+/// in Settings is Sparkle's preference. Info.plist carries the feed URL and
+/// public key (see app/project.yml).
 @MainActor
 @Observable
 final class Updater {
@@ -15,20 +16,15 @@ final class Updater {
     private let delegate = UpdaterDelegate()
     private var observation: NSKeyValueObservation?
     private var checkedAtLaunch = false
-    private static let automaticChecksKey = "automaticUpdateChecks"
 
     private(set) var canCheck = false
     var automaticChecks: Bool {
-        didSet { UserDefaults.standard.set(automaticChecks, forKey: Self.automaticChecksKey) }
+        didSet { controller.updater.automaticallyChecksForUpdates = automaticChecks }
     }
 
     private init() {
-        UserDefaults.standard.register(defaults: [Self.automaticChecksKey: true])
-        automaticChecks = UserDefaults.standard.bool(forKey: Self.automaticChecksKey)
-        controller = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: delegate, userDriverDelegate: nil)
-        // Older builds may have persisted an opt-in to Sparkle's scheduler.
-        controller.updater.automaticallyChecksForUpdates = false
-        controller.startUpdater()
+        controller = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: delegate, userDriverDelegate: nil)
+        automaticChecks = controller.updater.automaticallyChecksForUpdates
         observation = controller.updater.observe(\.canCheckForUpdates, options: [.initial, .new]) { [weak self] _, change in
             guard let can = change.newValue else { return }
             Task { @MainActor in self?.canCheck = can }
@@ -37,6 +33,8 @@ final class Updater {
 
     func check() { controller.updater.checkForUpdates() }
 
+    /// The scheduler only fires at launch once a day has passed; this makes
+    /// every launch check, so an urgent release is never a day late.
     func checkAtLaunch() {
         guard !checkedAtLaunch else { return }
         checkedAtLaunch = true
@@ -70,7 +68,7 @@ struct UpdatesSettingsSection: View {
     var body: some View {
         Section("Updates") {
             Toggle("Check for updates automatically", isOn: $updater.automaticChecks)
-            Text("On by default. Teleport Bread checks for updates once when the app launches. Nothing about you or your reminders is sent.")
+            Text("On by default. Teleport Bread checks for updates when it launches and once a day after that. Nothing about you or your reminders is sent.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             Button("Check Now") { updater.check() }

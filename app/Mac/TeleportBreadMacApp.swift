@@ -74,7 +74,10 @@ struct MacRootView: View {
         .background(Theme.canvas)
         .task { await model.start() }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await model.refresh() } }
+            if phase == .active {
+                Task { await model.refresh() }
+                Task { await gate.checkIfStale() }
+            }
         }
         .task { installKeyMonitors() }
         // The one reliable source for "is ⌘ down": SwiftUI's modifier-key
@@ -97,9 +100,10 @@ struct MacRootView: View {
             #if DIRECT
             Updater.shared.checkAtLaunch()
             #endif
-            await gate.checkAtLaunch()
+            await gate.checkIfStale()
             await Snapshotter.run(model: model, ui: ui, gate: gate)
         }
+        .task { await gate.runDaily() }
     }
 
     @ViewBuilder private var content: some View {
