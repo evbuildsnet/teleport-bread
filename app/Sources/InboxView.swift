@@ -60,6 +60,7 @@ struct InboxView: View {
                 }
             }
             .listStyle(.plain)
+            .safeAreaInset(edge: .top, spacing: 0) { VersionBanner() }
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                 max(0, -(geometry.contentOffset.y + geometry.contentInsets.top))
             } action: { _, overscroll in
@@ -357,5 +358,5 @@ struct SnoozeDateSheet: View {
 enum ComposeOutcome { case dismissed, discarded, sent }
 
 #Preview("Inbox") {
-    InboxView().environment(AppModel.preview())
+    InboxView().environment(AppModel.preview()).environment(VersionGate())
 }

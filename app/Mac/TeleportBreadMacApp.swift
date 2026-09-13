@@ -5,6 +5,7 @@ import SwiftUI
 @main
 struct TeleportBreadMacApp: App {
     @State private var model = ProcessInfo.processInfo.environment["TELEPORTBREAD_PREVIEW"] == nil ? AppModel() : AppModel.preview()
+    @State private var gate = VersionGate()
     @State private var ui = UIState()
     @State private var shortcuts = Shortcuts.shared
 
@@ -13,6 +14,7 @@ struct TeleportBreadMacApp: App {
             MacRootView()
                 .environment(model)
                 .environment(ui)
+                .environment(gate)
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1100, height: 780)
@@ -28,7 +30,7 @@ struct TeleportBreadMacApp: App {
                 menuItem("New Need", .action(.newNeed))
                     .disabled(model.phase != .ready)
                 Button("Quick Capture") { CapturePanelController.shared.toggle(model: model) }
-                    .disabled(model.phase != .ready)
+                    .disabled(model.phase != .ready || gate.required)
             }
             CommandMenu("Go") {
                 menuItem("Command Palette", .action(.palette))
@@ -49,27 +51,22 @@ struct TeleportBreadMacApp: App {
     private func menuItem(_ title: String, _ command: KeyCommand) -> some View {
         Button(title) { ui.perform(command, model: model) }
             .keyboardShortcut(KeyBindings.binding(for: command, shortcuts).combo.keyboardShortcut)
+            .disabled(gate.required)
     }
 }
 
 struct MacRootView: View {
     @Environment(AppModel.self) private var model
     @Environment(UIState.self) private var ui
+    @Environment(VersionGate.self) private var gate
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Group {
-            switch model.phase {
-            case .loading, .needsAccess:
-                ProgressView()
-            case .denied:
-                ContentUnavailableView(
-                    "No Reminders access",
-                    systemImage: "lock",
-                    description: Text("Teleport Bread is a lens over Apple Reminders. Grant full access in System Settings → Privacy & Security → Reminders.")
-                )
-            case .ready:
-                MainWindow()
+            if gate.required {
+                VersionLockView()
+            } else {
+                content
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -77,7 +74,10 @@ struct MacRootView: View {
         .background(Theme.canvas)
         .task { await model.start() }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await model.refresh() } }
+            if phase == .active {
+                Task { await model.refresh() }
+                Task { await gate.checkIfStale() }
+            }
         }
         .task { installKeyMonitors() }
         // The one reliable source for "is ⌘ down": SwiftUI's modifier-key
@@ -86,9 +86,39 @@ struct MacRootView: View {
             let command = new.contains(.command)
             if ui.commandHeld != command { ui.commandHeld = command }
         }
-        .task { HotKeyCenter.shared.onPress = { CapturePanelController.shared.toggle(model: model) } }
+        .task {
+            HotKeyCenter.shared.onPress = {
+                guard !gate.required else { return }
+                CapturePanelController.shared.toggle(model: model)
+            }
+        }
+        .onChange(of: gate.required) { _, required in
+            if required { CapturePanelController.shared.close() }
+        }
         .background(WindowReader { window in if ui.window !== window { ui.window = window } })
-        .task { await Snapshotter.run(model: model, ui: ui) }
+        .task {
+            #if DIRECT
+            Updater.shared.checkAtLaunch()
+            #endif
+            await gate.checkIfStale()
+            await Snapshotter.run(model: model, ui: ui, gate: gate)
+        }
+        .task { await gate.runDaily() }
+    }
+
+    @ViewBuilder private var content: some View {
+        switch model.phase {
+        case .loading, .needsAccess:
+            ProgressView()
+        case .denied:
+            ContentUnavailableView(
+                "No Reminders access",
+                systemImage: "lock",
+                description: Text("Teleport Bread is a lens over Apple Reminders. Grant full access in System Settings → Privacy & Security → Reminders.")
+            )
+        case .ready:
+            MainWindow()
+        }
     }
 
     /// One monitor: ⌘-held badges, key bindings (context-aware, ahead of the
@@ -120,7 +150,7 @@ struct MacRootView: View {
                 let command = flags.contains(.command)
                 // Write only on change: every write re-renders observers.
                 if ui.commandHeld != command { ui.commandHeld = command }
-                guard !isFlagsChange, model.phase == .ready else { return false }
+                guard !isFlagsChange, model.phase == .ready, !gate.required else { return false }
                 if event.window === ui.window, KeyBindings.handle(event, ui: ui, model: model) { return true }
                 guard !ui.paletteOpen,
                       flags.intersection([.command, .control, .option]).isEmpty,

@@ -22,7 +22,9 @@ There are few things to clarify for human-agents communication. Let's get acquin
 Two Mac targets share one code base (`app/project.yml`, template `MacApp`):
 
 - `TeleportBreadMac` — Mac App Store. Sandboxed, no updater; Apple ships updates.
-- `TeleportBreadMacDirect` — notarized download from teleportbread.com. Same sandbox plus Sparkle, compiled in only under the `DIRECT` condition (`app/Mac/Updater.swift`). Automatic update checks are off until the user opts in from Settings, so the app makes no network calls by default.
+- `TeleportBreadMacDirect` — notarized download from teleportbread.com. Same sandbox plus Sparkle, compiled in only under the `DIRECT` condition (`app/Mac/Updater.swift`). Automatic update checks are on by default: once at launch and daily after that; Settings can turn them off.
+
+Both Mac channels and iOS fetch `website/public/app-version.json` from teleportbread.com at launch and at most once a day after that. A version below its platform's `minimum` locks the inbox until updated; network or policy errors leave the app usable. No identifiers or reminders are sent.
 
 Releasing the direct build is one action: push a tag `vX.Y.Z`. `.github/workflows/release-direct.yml` archives, notarizes, signs the zip for Sparkle, publishes a GitHub Release, and commits `website/public/appcast.xml` to main. The appcast commit is the moment users can see the update. The private Sparkle key lives in the `SPARKLE_PRIVATE_KEY` secret and in Ev's login Keychain; losing it means shipped apps can never update again.
 
