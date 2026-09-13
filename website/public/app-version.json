@@ -2,6 +2,7 @@
   "ios": {
     "minimum": "1.0",
     "latest": "1.1",
+    "store": "https://apps.apple.com/app/id6806453877",
     "testflight": "https://testflight.apple.com/join/EjA9WTnY"
   },
   "mac": {

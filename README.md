@@ -55,7 +55,7 @@ Locally, `scripts/release-ios.sh` does the same with `ASC_KEY_ID`, `ASC_ISSUER_I
 
 `website/public/app-version.json` is deployed to teleportbread.com with the site. Each native app fetches it once at launch, with no retry or foreground check. An unavailable or invalid file leaves the app usable.
 
-The `ios` and `mac` entries each specify `minimum`, `latest`, an optional `store` URL, and an optional `message` explaining a required update. iOS also has a `testflight` URL. Add a `store` URL to each entry once the App Store pages are published; until then, the Update button falls back to teleportbread.com.
+The `ios` and `mac` entries each specify `minimum`, `latest`, an optional `store` URL, and an optional `message` explaining a required update. iOS also has a `testflight` URL. The Mac entry gets a `store` URL once the Mac App Store page exists; until then its Update button falls back to teleportbread.com.
 
 To require an update, first make the replacement available through the affected stores and the Mac direct appcast, then bump that platform's `minimum` (and `latest` if needed), and commit the file to `main`. The site deployment makes the gate effective on the next app launch. Keep `latest` at least as high as `minimum`; bumping only `latest` shows a dismissable iOS banner. The Mac entry applies to both Mac channels.
 
@@ -63,7 +63,7 @@ The gate reads `CFBundleShortVersionString`, so `MARKETING_VERSION` must match t
 
 ### Secrets and keys
 
-The workflows need these repository secrets: `DEVELOPER_ID_P12_BASE64`, `DEVELOPER_ID_P12_PASSWORD`, `NOTARY_KEY_ID`, `NOTARY_ISSUER_ID`, `NOTARY_KEY_P8`, `SPARKLE_PRIVATE_KEY`, and for TestFlight `APPLE_DISTRIBUTION_P12_BASE64` and `APPLE_DISTRIBUTION_P12_PASSWORD`. The notary key is an App Store Connect API key and doubles as the TestFlight upload credential. Backups of the underlying files are in Ev's iCloud under Business/Personal/codes.
+The workflows need these repository secrets: `DEVELOPER_ID_P12_BASE64`, `DEVELOPER_ID_P12_PASSWORD`, `NOTARY_KEY_ID`, `NOTARY_ISSUER_ID`, `NOTARY_KEY_P8`, `SPARKLE_PRIVATE_KEY`, and for TestFlight `APPLE_DISTRIBUTION_P12_BASE64` and `APPLE_DISTRIBUTION_P12_PASSWORD`. The notary key is an App Store Connect API key and doubles as the TestFlight upload credential. Backups of the underlying files, plus the API key id and issuer id, are in Ev's iCloud Drive under `Documents/Business/Personal/codes/teleport-bread-release`.
 
 The Sparkle private key is the one thing that cannot be rotated quietly: every shipped app trusts it. Guard it.
 
