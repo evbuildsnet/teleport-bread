@@ -23,7 +23,7 @@ That triggers `.github/workflows/release-direct.yml`, which:
 4. publishes a GitHub Release with the zip,
 5. commits the appcast to `main`, which Railway deploys to teleportbread.com.
 
-Users with automatic checks on see the update within a day. Everyone else sees it on "Check for Updates…". Watch a run with `gh run watch`.
+Automatic checks are on by default and run once when the app launches. Users can turn them off in Settings or use "Check for Updates…" at any time. Watch a run with `gh run watch`.
 
 Version numbers come from the tag. The build number is the workflow run number and must only go up, so never delete and recreate a tag after a release has shipped.
 
@@ -32,11 +32,29 @@ Version numbers come from the tag. The build number is the workflow run number a
 Manual, through Xcode:
 
 1. Open `app/TeleportBread.xcodeproj` (run `make gen` first if it is missing).
-2. Select the `TeleportBreadMac` scheme, then Product → Archive.
-3. In Organizer: Distribute App → App Store Connect → Upload.
-4. On appstoreconnect.apple.com, create the new macOS version, attach the build, fill in what's new, and submit for review.
+2. Set `MARKETING_VERSION` to the release version and increment `CURRENT_PROJECT_VERSION` in `app/project.yml`, then run `make gen`.
+3. Select the `TeleportBreadMac` scheme, then Product → Archive.
+4. In Organizer: Distribute App → App Store Connect → Upload.
+5. On appstoreconnect.apple.com, create the new macOS version, attach the build, fill in what's new, and submit for review.
 
 This target never contains Sparkle. Apple delivers its updates.
+
+### iOS / TestFlight
+
+1. Set `MARKETING_VERSION` to the release version and increment `CURRENT_PROJECT_VERSION` in `app/project.yml`, then run `make gen`.
+2. Open `app/TeleportBread.xcodeproj`, select the `TeleportBread` scheme and a device destination, then Product → Archive.
+3. In Organizer: Distribute App → App Store Connect → Upload.
+4. On appstoreconnect.apple.com, assign the build to TestFlight or attach it to the iOS version and submit for review.
+
+### Minimum supported versions
+
+`website/public/app-version.json` is deployed to teleportbread.com with the site. Each native app fetches it once at launch, with no retry or foreground check. An unavailable or invalid file leaves the app usable.
+
+The `ios` and `mac` entries each specify `minimum`, `latest`, a `store` URL, and an optional `message` explaining a required update. iOS also has a `testflight` URL. Replace the placeholder store URLs when the App Store pages are published; until then, the apps fall back to teleportbread.com.
+
+To require an update, first make the replacement available through the affected stores and the Mac direct appcast, then bump that platform's `minimum` (and `latest` if needed), and commit the file to `main`. The site deployment makes the gate effective on the next app launch. Keep `latest` at least as high as `minimum`; bumping only `latest` shows a dismissable iOS banner. The Mac entry applies to both Mac channels.
+
+The gate reads `CFBundleShortVersionString`, so `MARKETING_VERSION` must match the version being shipped. Builds predating the gate cannot enforce it. Debug builds can use `TELEPORTBREAD_VERSION_URL` to fetch a local policy for testing.
 
 ### Secrets and keys
 
