@@ -3,7 +3,8 @@
 #   1. archives the TeleportBread iOS target with the Apple Distribution certificate
 #   2. uploads it to App Store Connect, which processes it into TestFlight
 # The version is MARKETING_VERSION from app/project.yml unless overridden;
-# the build number is the workflow run number and only goes up.
+# the build number is the UTC minute of the upload, so local and CI uploads
+# never collide and always go up.
 #
 # Secrets: APPLE_DISTRIBUTION_P12_BASE64, APPLE_DISTRIBUTION_P12_PASSWORD,
 #          ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (an Admin App Store Connect
@@ -39,7 +40,7 @@ jobs:
             version=$(sed -n 's/^ *MARKETING_VERSION: *"\(.*\)"/\1/p' app/project.yml)
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "build=$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "build=$(date -u +%Y%m%d%H%M)" >> "$GITHUB_OUTPUT"
 
       - name: Install xcodegen
         run: brew install xcodegen

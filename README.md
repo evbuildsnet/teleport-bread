@@ -47,9 +47,9 @@ One click. Run the "TestFlight (iOS)" workflow from the Actions tab or:
 gh workflow run testflight.yml
 ```
 
-`.github/workflows/testflight.yml` archives the `TeleportBread` target with the Apple Distribution certificate and uploads it to App Store Connect, which processes it into TestFlight. The version is `MARKETING_VERSION` from `app/project.yml` (override with the `version` input); the build number is the workflow run number. Signing is automatic through the App Store Connect API key, so no provisioning profiles live in the repo.
+`.github/workflows/testflight.yml` archives the `TeleportBread` target with the Apple Distribution certificate and uploads it to App Store Connect, which processes it into TestFlight. The version is `MARKETING_VERSION` from `app/project.yml` (override with the `version` input); the build number is the UTC minute of the upload, so it always goes up. Signing is manual with the Apple Distribution certificate and the "TeleportBread iOS App Store" profile, which xcodebuild downloads from App Store Connect on demand, so no profile lives in the repo.
 
-Locally, `scripts/release-ios.sh` does the same with `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_PATH` set and the distribution certificate in the keychain.
+Locally, `scripts/release-ios.sh <version> $(date -u +%Y%m%d%H%M) dist` does the same with `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_PATH` set and the distribution certificate in the keychain.
 
 ### Minimum supported versions
 
