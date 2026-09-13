@@ -9,7 +9,14 @@
 	<key>teamID</key>
 	<string>CPUP238G9V</string>
 	<key>signingStyle</key>
-	<string>automatic</string>
+	<string>manual</string>
+	<key>signingCertificate</key>
+	<string>Apple Distribution</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>dev.ev.teleportbread.app</key>
+		<string>TeleportBread iOS App Store</string>
+	</dict>
 	<key>uploadSymbols</key>
 	<true/>
 	<key>manageAppVersionAndBuildNumber</key>
